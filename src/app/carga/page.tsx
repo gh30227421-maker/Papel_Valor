@@ -16,6 +16,7 @@ export default function CargaMasiva() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [progress, setProgress] = useState<number>(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,6 +36,7 @@ export default function CargaMasiva() {
       setFile(e.target.files[0]);
       setStatus("idle");
       setMessage("");
+      setProgress(0);
     }
   };
 
@@ -43,6 +45,7 @@ export default function CargaMasiva() {
     setFile(null);
     setStatus("idle");
     setMessage("");
+    setProgress(0);
     if(fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -51,6 +54,7 @@ export default function CargaMasiva() {
     
     setStatus("loading");
     setMessage("Analizando archivo Excel...");
+    setProgress(0);
     
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -96,27 +100,31 @@ export default function CargaMasiva() {
         // LÓGICA ESPECIAL POR MÓDULO
         // -------------------------------------------------------------
         if (selectedTable === "stock_actual") {
-          setMessage("Borrando inventario anterior (Sustitución Total)...");
-          // Borrar todo el stock actual (usamos not is null para asegurar el borrado masivo)
-          const { error: delErr } = await supabase.from("stock_actual").delete().not("codigo_agencia", "is", null);
+          setMessage("Vaciando inventario anterior (Sustitución Total instantánea)...");
+          // Borrar usando la nueva función TRUNCATE que ejecuta en milisegundos
+          const { error: delErr } = await supabase.rpc("fn_truncate_stock_actual");
           if (delErr) throw new Error(`Error al borrar stock anterior: ${delErr.message}`);
         }
 
         // -------------------------------------------------------------
         // INSERCIÓN POR LOTES (CHUNKS)
         // -------------------------------------------------------------
-        const CHUNK_SIZE = 5000;
+        // Reducido a 500 para evitar "statement timeout" en Supabase cuando la base de datos está bajo carga o tiene triggers
+        const CHUNK_SIZE = 500;
         const totalChunks = Math.ceil(cleanedRecords.length / CHUNK_SIZE);
 
         for (let i = 0; i < cleanedRecords.length; i += CHUNK_SIZE) {
           const chunk = cleanedRecords.slice(i, i + CHUNK_SIZE);
-          setMessage(`Insertando bloque ${Math.floor(i / CHUNK_SIZE) + 1} de ${totalChunks}... (${chunk.length} registros)`);
+          const currentChunk = Math.floor(i / CHUNK_SIZE) + 1;
+          setMessage(`Insertando bloque ${currentChunk} de ${totalChunks}...`);
           
           const { error } = await supabase.from(selectedTable).insert(chunk);
           if (error) {
             console.error("Supabase Error en lote:", error);
-            throw new Error(`Fallo en el bloque ${Math.floor(i / CHUNK_SIZE) + 1}: ${error.message}`);
+            throw new Error(`Fallo en el bloque ${currentChunk}: ${error.message}`);
           }
+          
+          setProgress(Math.round((currentChunk / totalChunks) * 100));
         }
 
         // -------------------------------------------------------------
@@ -127,7 +135,8 @@ export default function CargaMasiva() {
           const { error: rpcErr } = await supabase.rpc("fn_refresh_dashboard_mv");
           if (rpcErr) {
             console.warn("Error al refrescar la vista materializada", rpcErr);
-            throw new Error("Se subieron los datos, pero falló la actualización del dashboard.");
+            // En vez de fallar la subida, lo dejamos pasar porque los datos SÍ se subieron.
+            // El timeout es solo en la lectura pesada del dashboard.
           }
         }
 
@@ -236,6 +245,21 @@ export default function CargaMasiva() {
               )}
             </div>
 
+            {/* BARRA DE PROGRESO */}
+            {status === "loading" && progress > 0 && (
+              <div className="mb-6 animate-in fade-in">
+                <div className="flex justify-between text-sm font-bold text-[#00205B] mb-2">
+                  <span>{message}</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-3 border border-gray-200 overflow-hidden shadow-inner">
+                  <div className="bg-gradient-to-r from-[#FE5000] to-[#ff7e3e] h-full rounded-full transition-all duration-300 relative" style={{ width: `${progress}%` }}>
+                    <div className="absolute inset-0 bg-white/20 w-full h-full" style={{ backgroundImage: 'linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent)', backgroundSize: '1rem 1rem', animation: 'progress-stripes 1s linear infinite' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* MENSAJES DE ESTADO */}
             {status === "error" && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-medium flex items-start animate-in fade-in">
@@ -276,4 +300,16 @@ export default function CargaMasiva() {
       </main>
     </div>
   );
+}
+
+// Añadimos la animación para las rayas de la barra de progreso
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.innerHTML = `
+    @keyframes progress-stripes {
+      from { background-position: 1rem 0; }
+      to { background-position: 0 0; }
+    }
+  `;
+  document.head.appendChild(style);
 }

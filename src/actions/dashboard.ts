@@ -120,3 +120,18 @@ export async function getMonthlyPivot(filters: { year?: string; region?: string;
 
   return Object.values(monthsData).sort((a: any, b: any) => a.mes - b.mes);
 }
+
+export async function getDashboardLastUpdate() {
+  const { data, error } = await supabase.from("dashboard_metadata").select("last_refresh").eq("id", 1).single();
+  if (error || !data) return null;
+  return data.last_refresh;
+}
+
+export async function forceRefreshDashboard() {
+  const { error } = await supabase.rpc("fn_refresh_dashboard_mv");
+  if (error) {
+    console.error("Error refreshing dashboard:", error);
+    return false;
+  }
+  return true;
+}

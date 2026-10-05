@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import LoadingOverlay from "./LoadingOverlay";
-import { getDashboardStats, getFiltrosBasicos, getMonthlyPivot } from "@/actions/dashboard";
+import { getDashboardStats, getFiltrosBasicos, getMonthlyPivot, getDashboardLastUpdate, forceRefreshDashboard } from "@/actions/dashboard";
 import { 
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList
@@ -67,10 +67,12 @@ export default function DashboardStats() {
   const [selectedAgencia, setSelectedAgencia] = useState<string>("");
   const [mapTab, setMapTab] = useState<"estados" | "regiones">("estados");
   const [pivotData, setPivotData] = useState<any[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
-    const [data, pivot] = await Promise.all([
+    const [data, pivot, lastUpdateData] = await Promise.all([
       getDashboardStats({
         year: selectedYear,
         month: selectedMonth,
@@ -81,11 +83,22 @@ export default function DashboardStats() {
         year: selectedYear,
         region: selectedRegion,
         agencia: selectedAgencia
-      })
+      }),
+      getDashboardLastUpdate()
     ]);
     setStats(data);
     setPivotData(pivot);
+    setLastUpdate(lastUpdateData);
     setLoading(false);
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    const success = await forceRefreshDashboard();
+    if (success) {
+      await loadData();
+    }
+    setIsRefreshing(false);
   };
 
   useEffect(() => {
@@ -256,13 +269,33 @@ export default function DashboardStats() {
             </div>
             
           </div>
-          <button 
-            onClick={() => { setSelectedYear("Todos"); setSelectedRegion("Todas"); setSelectedEstado("Todos"); setSelectedAgencia(""); }}
-            className="px-3 py-1.5 bg-white border border-gray-300 rounded text-[11px] font-bold text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-            Limpiar
-          </button>
+          <div className="flex flex-col items-end justify-end gap-1.5 shrink-0 ml-2">
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="px-3 py-1.5 bg-[#FE5000] border border-[#FE5000] rounded text-[11px] font-bold text-white hover:bg-[#e04800] flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                <svg className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                {isRefreshing ? 'Sincronizando...' : 'Sincronizar'}
+              </button>
+              <button 
+                onClick={() => { setSelectedYear("Todos"); setSelectedRegion("Todas"); setSelectedEstado("Todos"); setSelectedAgencia(""); }}
+                className="px-3 py-1.5 bg-white border border-gray-300 rounded text-[11px] font-bold text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 shadow-sm"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Limpiar
+              </button>
+            </div>
+            {lastUpdate && (
+              <span className="text-[9px] font-bold text-gray-400 mt-0.5">
+                ACTUALIZADO: {new Date(lastUpdate).toLocaleString('es-VE', { 
+                  day: '2-digit', month: '2-digit', year: 'numeric', 
+                  hour: '2-digit', minute: '2-digit', hour12: true 
+                })}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

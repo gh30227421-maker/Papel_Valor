@@ -163,6 +163,22 @@ export default function ReportGenerator() {
 
   const totalQuantity = despachos.reduce((acc, curr) => acc + (curr.cantidad || 0), 0);
 
+  // Solución segura para evitar que la zona horaria le reste 1 día (ej. 5/10 se vuelva 4/10)
+  const formatLocalDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  // Función para dar formato a los correlativos con espacios
+  const formatCorrelativo = (corr: string) => {
+    if (!corr) return "";
+    return corr.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-in fade-in duration-300">
       
@@ -245,27 +261,21 @@ export default function ReportGenerator() {
                   suppressContentEditableWarning={true}
                   style={{ fontFamily: '"Microsoft Sans Serif", sans-serif', fontSize: "14px", color: "#333", outline: "none" }}
                 >
-                  <p><strong>Buen Día,</strong></p>
-                  <br />
-                  <p><strong>Estimados Regionales:</strong></p>
-                  <br />
-                  <p>Por medio de la presente, cumplo con informarles que se llevó a cabo la distribución de Tarjetas MasterCard Debit a las agencias detalladas a continuación.</p>
-                  <br />
-                  <p>Asimismo, es importante señalar que las oficinas que no hayan recibido el despacho correspondiente en la fecha actual se debe a que cuentan con un inventario adecuado de papel valor, calculado en base a sus consumos.</p>
-                  <br />
-                  <p>Aunado a eso a todas aquellas oficinas que dispongan de alguna Nomina, Jornada Especial, Operativos (Agencia Móvil), es sumamente importante que esta solicitud sea remitidas a nuestro buzón: <strong>papelvalor@bncenlinea.net</strong>, para que sean atendidas y estas no afecten el inventario mensual de la agencia.</p>
-                  <br />
-                  <p>En virtud de lo anterior, les solicitamos transmitir esta información de manera oportuna a todas las agencias pertenecientes a cada Región para asegurar que confirmen la recepción del envío, esencial para un seguimiento y control adecuado.</p>
-                  <br />
-                  <ol style={{ paddingLeft: "20px", margin: "10px 0" }}>
+                  <p style={{ margin: "0 0 12px 0" }}><strong>Buen Día,</strong></p>
+                  <p style={{ margin: "0 0 12px 0" }}><strong>Estimados Regionales:</strong></p>
+                  <p style={{ margin: "0 0 12px 0" }}>Por medio de la presente, cumplo con informarles que se llevó a cabo la distribución de Tarjetas MasterCard Debit a las agencias detalladas a continuación.</p>
+                  <p style={{ margin: "0 0 12px 0" }}>Asimismo, es importante señalar que las oficinas que no hayan recibido el despacho correspondiente en la fecha actual se debe a que cuentan con un inventario adecuado de papel valor, calculado en base a sus consumos.</p>
+                  <p style={{ margin: "0 0 12px 0" }}>Aunado a eso a todas aquellas oficinas que dispongan de alguna Nomina, Jornada Especial, Operativos (Agencia Móvil), es sumamente importante que esta solicitud sea remitidas a nuestro buzón: <strong>papelvalor@bncenlinea.net</strong>, para que sean atendidas y estas no afecten el inventario mensual de la agencia.</p>
+                  <p style={{ margin: "0 0 12px 0" }}>En virtud de lo anterior, les solicitamos transmitir esta información de manera oportuna a todas las agencias pertenecientes a cada Región para asegurar que confirmen la recepción del envío, esencial para un seguimiento y control adecuado.</p>
+                  
+                  <ol style={{ paddingLeft: "20px", margin: "0 0 12px 0" }}>
                     <li style={{ marginBottom: "8px" }}><strong>Conteo y Verificación:</strong> Se debe realizar un conteo físico exhaustivo de las tarjetas recibidas.</li>
                     <li><strong>Confirmación de Recepción:</strong> solicitamos que todas las oficinas confirmen la recepción de las tarjetas y la cantidad exacta recibida utilizando el siguiente enlace: <a href={typeof window !== 'undefined' ? `${window.location.origin}/recepcion` : '#'} style={{color: "#00205B", textDecoration: "underline"}}>{typeof window !== 'undefined' ? `${window.location.origin}/recepcion` : 'Enlace de Recepción'}</a></li>
                   </ol>
-                  <br />
-                  <p>Agradecemos de antemano su colaboración y la difusión urgente de estas instrucciones a los funcionarios correspondientes para garantizar el control y la seguridad del Papel Valor.</p>
-                  <br />
-                  <p>Adjunto la relación de correspondencia del día de hoy:</p>
-                  <br />
+                  
+                  <p style={{ margin: "0 0 12px 0" }}>Agradecemos de antemano su colaboración y la difusión urgente de estas instrucciones a los funcionarios correspondientes para garantizar el control y la seguridad del Papel Valor.</p>
+                  
+                  <p style={{ margin: "0 0 12px 0" }}>Adjunto la relación de correspondencia del día de hoy:</p>
                   
                   <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #ddd", fontSize: "12px", cursor: "default", fontFamily: "Arial, sans-serif" }} contentEditable={false}>
                     <thead>
@@ -287,8 +297,8 @@ export default function ReportGenerator() {
                           <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.agencias?.region}</td>
                           <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.agencias?.zona}</td>
                           <td style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", fontWeight: "bold" }}>{Number(d.cantidad).toLocaleString('es-VE')}</td>
-                          <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace", textAlign: "center" }}>{d.correlativo_inicial}</td>
-                          <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace", textAlign: "center" }}>{d.correlativo_final}</td>
+                          <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace", textAlign: "center" }}>{formatCorrelativo(d.correlativo_inicial)}</td>
+                          <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace", textAlign: "center" }}>{formatCorrelativo(d.correlativo_final)}</td>
                         </tr>
                       ))}
                       <tr style={{ backgroundColor: "#f9f9f9", fontWeight: "bold" }}>
@@ -298,10 +308,6 @@ export default function ReportGenerator() {
                       </tr>
                     </tbody>
                   </table>
-
-                  <br />
-                  <p>Saludos cordiales,</p>
-                  <p><strong>{operator}</strong><br />Distribución Papel Valor<br />Banco Nacional de Crédito</p>
                 </div>
               </div>
             </div>
@@ -335,7 +341,7 @@ export default function ReportGenerator() {
             <div className="print-document flex flex-col gap-8 print:gap-0">
               <style dangerouslySetInnerHTML={{__html: `
                 @media print {
-                  html, body { width: 100%; margin: 0 !important; padding: 0 !important; }
+                  html, body { width: 100%; margin: 0 !important; padding: 0 !important; overflow-x: hidden; }
                   body * { visibility: hidden; }
                   .print-document, .print-document * { visibility: visible; }
                   .print-document { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
@@ -344,106 +350,109 @@ export default function ReportGenerator() {
                 }
               `}} />
 
-              {Array.from({ length: Math.ceil(despachos.length / 20) || 1 }, (_, pageIndex) => {
-                const chunk = despachos.slice(pageIndex * 20, (pageIndex + 1) * 20);
-                const isLastPage = pageIndex === Math.ceil(despachos.length / 20) - 1;
+              {Array.from({ length: Math.ceil(despachos.length / 15) || 1 }, (_, pageIndex) => {
+                const chunk = despachos.slice(pageIndex * 15, (pageIndex + 1) * 15);
+                const isLastChunk = pageIndex === Math.ceil(despachos.length / 15) - 1;
                 const pageTotalQuantity = chunk.reduce((acc, curr) => acc + (curr.cantidad || 0), 0);
 
-                return (
-                  <div key={pageIndex} className={`bg-white p-6 shadow-lg print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-full ${!isLastPage ? 'page-break' : ''} flex flex-col box-border`}>
-                    
-                    {/* Header */}
-                    <div className="flex justify-between items-start border-b-2 border-[#00205B] pb-2 mb-3 shrink-0 print:w-full">
-                      {/* Movido un poco a la derecha */}
-                      <div className="flex items-center gap-4 print:ml-8">
-                        <img 
-                          src="/logo-bnc.png" 
-                          alt="Logo BNC" 
-                          className="h-14 w-auto object-contain print:h-10"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                        <div>
-                          <h1 className="text-xl font-black text-[#00205B] tracking-tight">BANCO NACIONAL DE CRÉDITO</h1>
-                          <h2 className="text-[10px] font-bold text-gray-800 mt-1 uppercase tracking-widest">V.P.E BANCA COMERCIAL / ADMINISTRACIÓN DE AGENCIAS</h2>
-                          <h3 className="text-[9px] font-bold text-gray-500 mt-0.5 uppercase tracking-widest">Inventario Papel Valor / Distribución MasterCard Debit</h3>
+                return ['ORIGINAL', 'COPIA (CORRESPONDENCIA)'].map((tipoCopia, copyIndex) => {
+                  const isVeryLastElement = isLastChunk && copyIndex === 1;
+
+                  return (
+                    <div key={`${pageIndex}-${copyIndex}`} className={`bg-white p-6 shadow-lg print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-full ${!isVeryLastElement ? 'page-break' : ''} flex flex-col box-border`}>
+                      
+                      {/* Header */}
+                      <div className="flex justify-between items-start border-b-2 border-[#00205B] pb-2 mb-3 shrink-0 print:w-full">
+                        <div className="flex items-center gap-4 print:ml-8">
+                          <img 
+                            src="/logo-bnc.png" 
+                            alt="Logo BNC" 
+                            className="h-14 w-auto object-contain print:h-10"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div>
+                            <h1 className="text-xl font-black text-[#00205B] tracking-tight">BANCO NACIONAL DE CRÉDITO</h1>
+                            <h2 className="text-[10px] font-bold text-gray-800 mt-1 uppercase tracking-widest">V.P.E BANCA COMERCIAL / ADMINISTRACIÓN DE AGENCIAS</h2>
+                            <h3 className="text-[9px] font-bold text-gray-500 mt-0.5 uppercase tracking-widest">Inventario Papel Valor / Distribución MasterCard Debit</h3>
+                          </div>
+                        </div>
+                        <div className="text-right print:mr-12">
+                          <p className="text-xs font-bold text-gray-800">Fecha de Relación</p>
+                          <p className="text-base font-black text-[#FE5000]">{formatLocalDate(date)}</p>
+                          <p className="text-[10px] text-gray-500">Pág. {pageIndex + 1} / {Math.ceil(despachos.length / 15) || 1}</p>
+                          <p className="text-[10px] font-black text-[#009639] mt-1 border border-[#009639] px-2 py-0.5 rounded uppercase">{tipoCopia}</p>
                         </div>
                       </div>
-                      {/* Movido un poco a la izquierda */}
-                      <div className="text-right print:mr-12">
-                        <p className="text-xs font-bold text-gray-800">Fecha de Relación</p>
-                        <p className="text-base font-black text-[#FE5000]">{new Date(date).toLocaleDateString('es-VE')}</p>
-                        <p className="text-[10px] text-gray-500">Pág. {pageIndex + 1} / {Math.ceil(despachos.length / 20) || 1}</p>
-                      </div>
-                    </div>
 
-                    {/* Table */}
-                    <div className="flex-1 print:w-full print:px-4">
-                      <table className="w-full text-left text-[10px] border-collapse" style={{ tableLayout: 'fixed' }}>
-                        <thead>
-                          <tr className="bg-gray-100 border-b-2 border-gray-300">
-                            <th className="w-[5%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Cód</th>
-                            <th className="w-[25%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Agencia</th>
-                            <th className="w-[15%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Región</th>
-                            <th className="w-[15%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Zona</th>
-                            <th className="w-[8%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Cant.</th>
-                            <th className="w-[16%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Corr. Inicial</th>
-                            <th className="w-[16%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Corr. Final</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {chunk.map((d, i) => (
-                            <tr key={d.id} className={`border-b border-gray-200 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                              <td className="py-1 px-1 font-bold text-gray-900 break-words">{d.codigo_agencia}</td>
-                              <td className="py-1 px-1 text-gray-800 break-words">{d.agencias?.nombre}</td>
-                              <td className="py-1 px-1 text-gray-600 text-[9px] break-words">{d.agencias?.region}</td>
-                              <td className="py-1 px-1 text-gray-600 text-[9px] break-words">{d.agencias?.zona}</td>
-                              <td className="py-1 px-1 font-black text-center text-gray-900 break-words">{Number(d.cantidad).toLocaleString('es-VE')}</td>
-                              <td className="py-1 px-1 font-mono text-[9px] text-center text-gray-800 break-words">{d.correlativo_inicial}</td>
-                              <td className="py-1 px-1 font-mono text-[9px] text-center text-gray-800 break-words">{d.correlativo_final}</td>
+                      {/* Table */}
+                      <div className="flex-1 print:w-full print:px-4">
+                        <table className="w-full text-left text-[10px] border-collapse" style={{ tableLayout: 'fixed' }}>
+                          <thead>
+                            <tr className="bg-gray-100 border-b-2 border-gray-300">
+                              <th className="w-[5%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Cód</th>
+                              <th className="w-[25%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Agencia</th>
+                              <th className="w-[15%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Región</th>
+                              <th className="w-[15%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Zona</th>
+                              <th className="w-[8%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Cant.</th>
+                              <th className="w-[16%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Corr. Inicial</th>
+                              <th className="w-[16%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Corr. Final</th>
                             </tr>
-                          ))}
-                          
-                          {/* Subtotal de Página */}
-                          <tr className="border-t-2 border-gray-400 bg-gray-50">
-                            <td colSpan={4} className="py-2 px-1 font-bold text-right text-[10px] text-gray-600">TOTAL DE ESTA PÁGINA:</td>
-                            <td className="py-2 px-1 font-bold text-center text-xs text-[#00205B]">{Number(pageTotalQuantity).toLocaleString('es-VE')}</td>
-                            <td colSpan={2}></td>
-                          </tr>
-
-                          {/* Total General (Solo Última Página) */}
-                          {isLastPage && Math.ceil(despachos.length / 20) > 1 && (
-                            <tr className="border-t-4 border-gray-800 bg-gray-100">
-                              <td colSpan={4} className="py-2 px-1 font-black text-right text-xs">TOTAL GENERAL (TODAS LAS PÁGINAS):</td>
-                              <td className="py-2 px-1 font-black text-center text-sm text-[#009639]">{Number(totalQuantity).toLocaleString('es-VE')}</td>
+                          </thead>
+                          <tbody>
+                            {chunk.map((d, i) => (
+                              <tr key={d.id} className={`border-b border-gray-200 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                <td className="py-1 px-1 font-bold text-gray-900 break-words">{d.codigo_agencia}</td>
+                                <td className="py-1 px-1 text-gray-800 break-words">{d.agencias?.nombre}</td>
+                                <td className="py-1 px-1 text-gray-600 text-[9px] break-words">{d.agencias?.region}</td>
+                                <td className="py-1 px-1 text-gray-600 text-[9px] break-words">{d.agencias?.zona}</td>
+                                <td className="py-1 px-1 font-black text-center text-gray-900 break-words">{Number(d.cantidad).toLocaleString('es-VE')}</td>
+                                <td className="py-1 px-1 font-mono text-[9px] text-center text-gray-800 break-words">{formatCorrelativo(d.correlativo_inicial)}</td>
+                                <td className="py-1 px-1 font-mono text-[9px] text-center text-gray-800 break-words">{formatCorrelativo(d.correlativo_final)}</td>
+                              </tr>
+                            ))}
+                            
+                            {/* Subtotal de Página */}
+                            <tr className="border-t-2 border-gray-400 bg-gray-50">
+                              <td colSpan={4} className="py-2 px-1 font-bold text-right text-[10px] text-gray-600">TOTAL DE ESTA PÁGINA:</td>
+                              <td className="py-2 px-1 font-bold text-center text-xs text-[#00205B]">{Number(pageTotalQuantity).toLocaleString('es-VE')}</td>
                               <td colSpan={2}></td>
                             </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
 
-                    {/* Firmas (En todas las páginas) */}
-                    <div className="flex justify-around items-end mt-4 pt-4 shrink-0 print:w-full">
-                      {/* Firma 1: Más corta (25%) */}
-                      <div className="w-[25%] text-center border-t-2 border-gray-800 pt-1">
-                        <p className="font-bold text-xs text-gray-900">{operator}</p>
-                        <p className="font-semibold text-[10px] text-gray-500 uppercase">Elaborado Por</p>
+                            {/* Total General (Solo Última Página) */}
+                            {isLastChunk && Math.ceil(despachos.length / 15) > 1 && (
+                              <tr className="border-t-4 border-gray-800 bg-gray-100">
+                                <td colSpan={4} className="py-2 px-1 font-black text-right text-xs">TOTAL GENERAL (TODAS LAS PÁGINAS):</td>
+                                <td className="py-2 px-1 font-black text-center text-sm text-[#009639]">{Number(totalQuantity).toLocaleString('es-VE')}</td>
+                                <td colSpan={2}></td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
-                      {/* Firma 2: Más corta (25%) */}
-                      <div className="w-[25%] text-center border-t-2 border-gray-800 pt-1">
-                        <p className="font-bold text-xs text-gray-900 mt-4"></p>
-                        <p className="font-semibold text-[10px] text-gray-500 uppercase">Recibido Por (Correspondencia)</p>
-                      </div>
-                    </div>
 
-                    {/* Footer */}
-                    <div className="mt-4 text-center text-[8px] text-gray-400 font-bold uppercase tracking-widest border-t border-gray-200 pt-2 shrink-0 print:w-full">
-                      Generado por Sistema Central de Distribución TDD - Banco Nacional de Crédito
+                      {/* Firmas (En todas las páginas) */}
+                      <div className="flex justify-around items-end mt-4 pt-4 shrink-0 print:w-full">
+                        {/* Firma 1 */}
+                        <div className="w-[25%] text-center border-t-2 border-gray-800 pt-1">
+                          <p className="font-bold text-xs text-gray-900">{operator}</p>
+                          <p className="font-semibold text-[10px] text-gray-500 uppercase">Elaborado Por</p>
+                        </div>
+                        {/* Firma 2 */}
+                        <div className="w-[25%] text-center border-t-2 border-gray-800 pt-1">
+                          <p className="font-bold text-xs text-gray-900 mt-4"></p>
+                          <p className="font-semibold text-[10px] text-gray-500 uppercase">Recibido Por (Correspondencia)</p>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="mt-4 text-center text-[8px] text-gray-400 font-bold uppercase tracking-widest border-t border-gray-200 pt-2 shrink-0 print:w-full">
+                        Generado por Sistema Central de Distribución TDD - Banco Nacional de Crédito
+                      </div>
                     </div>
-                  </div>
-                );
+                  );
+                });
               })}
             </div>
           </div>
@@ -475,11 +484,11 @@ export default function ReportGenerator() {
             <div className="print-labels flex flex-col gap-8 print:gap-0">
               <style dangerouslySetInnerHTML={{__html: `
                 @media print {
-                  html, body { width: 100%; margin: 0 !important; padding: 0 !important; }
+                  html, body { width: 100%; margin: 0 !important; padding: 0 !important; overflow-x: hidden; }
                   body * { visibility: hidden; }
                   .print-labels, .print-labels * { visibility: visible; }
                   .print-labels { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
-                  @page { size: letter portrait; margin: 10mm; }
+                  @page { size: letter portrait; margin: 5mm; }
                   .page-break { break-after: page; page-break-after: always; }
                 }
               `}} />
@@ -489,10 +498,10 @@ export default function ReportGenerator() {
                 const isLastPage = pageIndex === Math.ceil(despachos.length / 4) - 1;
 
                 return (
-                  <div key={pageIndex} className={`bg-white p-8 shadow-lg print:shadow-none print:p-0 print:m-0 print:w-full print:h-[calc(100vh-20mm)] ${!isLastPage ? 'page-break' : ''}`}>
+                  <div key={pageIndex} className={`bg-white p-8 shadow-lg print:shadow-none print:p-0 print:m-0 print:w-full ${!isLastPage ? 'page-break' : ''}`}>
                     <div className="flex flex-col gap-6 print:gap-4 h-full">
                       {chunk.map((d, i) => (
-                        <div key={d.id} className="border-2 border-dashed border-gray-400 p-4 flex flex-col justify-between relative bg-white h-full max-h-[23vh]">
+                        <div key={d.id} className="border-2 border-dashed border-gray-400 p-4 flex flex-col justify-between relative bg-white min-h-[200px] print:min-h-[22vh]">
                           
                           <div className="flex-1 flex items-center gap-4">
                             {/* COL 1: Logo & Info Bancaria */}
@@ -548,7 +557,7 @@ export default function ReportGenerator() {
                               <div className="bg-gray-50 p-3 border border-gray-100 rounded-lg">
                                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Fecha de Envío</p>
                                 <p className="text-sm font-bold text-gray-800">
-                                  {new Date(date).toLocaleDateString('es-VE')}
+                                  {formatLocalDate(date)}
                                 </p>
                               </div>
                             </div>

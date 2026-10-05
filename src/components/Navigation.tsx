@@ -14,6 +14,37 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
   const [nombre, setNombre] = useState<string>(initialNombre);
   const [isNavigating, setIsNavigating] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+      // Update UI notify the user they can install the PWA
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+    }
+    // We've used the prompt, and can't use it again, throw it away
+    setDeferredPrompt(null);
+  };
 
   useEffect(() => {
     // Sincronizar si cambia desde el servidor
@@ -121,6 +152,18 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
               </Link>
             )}
             
+            {/* BOTÓN INSTALAR PWA */}
+            {isInstallable && (
+              <button 
+                onClick={handleInstallClick}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FE5000] text-white rounded-lg text-xs font-bold hover:bg-[#e04800] transition-colors shadow-sm ml-2 border border-[#FE5000]"
+                title="Instalar como aplicación de escritorio/móvil"
+              >
+                <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <span>Instalar</span>
+              </button>
+            )}
+
             {/* DROPDOWN DE USUARIO */}
             <div className="relative ml-2">
               <button 

@@ -20,12 +20,15 @@ export const metadata: Metadata = {
   title: "Papel Valor - Operaciones",
   description: "Sistema de gestión centralizada de papel valor y tarjetas.",
   manifest: "/manifest.json",
-  themeColor: "#FE5000",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Papel Valor",
   },
+};
+
+export const viewport = {
+  themeColor: "#FE5000",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

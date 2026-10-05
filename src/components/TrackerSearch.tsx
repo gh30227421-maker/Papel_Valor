@@ -6,9 +6,17 @@ import { supabase } from "@/lib/supabase";
 type SearchResult = {
   id: string;
   codigo_agencia: string;
-  tipo: string;
-  correlativo: string;
-  updated_at: string;
+  tipo?: string;
+  correlativo?: string;
+  updated_at?: string;
+  correlativo_inicial?: string;
+  correlativo_final?: string;
+  fecha_despacho?: string;
+  estatus_entrega?: string;
+  cantidad?: number;
+  fecha_recepcion?: string;
+  recibido_por?: string;
+  source?: 'stock' | 'despacho';
   agencias: {
     nombre: string;
     region: string;
@@ -68,6 +76,9 @@ export default function TrackerSearch() {
         correlativo_final,
         fecha_despacho,
         estatus_entrega,
+        cantidad,
+        fecha_recepcion,
+        recibido_por,
         agencias (
           nombre,
           region,
@@ -216,13 +227,34 @@ export default function TrackerSearch() {
                   </div>
                   
                   {result.source === 'despacho' && (
-                    <div className="col-span-2 pt-4 border-t border-gray-100">
-                      <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Rango del Lote Asignado</span>
-                      <div className="flex justify-between max-w-sm mt-1">
-                         <span className="font-mono text-gray-600 text-xs font-bold">I: {result.correlativo_inicial.replace(/(.{4})/g, '$1 ').trim()}</span>
-                         <span className="font-mono text-gray-600 text-xs font-bold">F: {result.correlativo_final.replace(/(.{4})/g, '$1 ').trim()}</span>
+                    <>
+                      <div className="col-span-2 pt-4 border-t border-gray-100">
+                        <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Rango del Lote Asignado</span>
+                        <div className="flex justify-between max-w-sm mt-1">
+                           <span className="font-mono text-gray-600 text-xs font-bold">I: {result.correlativo_inicial?.replace(/(.{4})/g, '$1 ').trim()}</span>
+                           <span className="font-mono text-gray-600 text-xs font-bold">F: {result.correlativo_final?.replace(/(.{4})/g, '$1 ').trim()}</span>
+                        </div>
                       </div>
-                    </div>
+                      
+                      <div className="col-span-2 pt-4 border-t border-gray-100 grid grid-cols-2 gap-y-4 gap-x-4">
+                        <div>
+                          <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Volumen Despachado</span>
+                          <span className="font-bold text-gray-800">{result.cantidad ? Number(result.cantidad).toLocaleString('es-VE') : "—"} UND</span>
+                        </div>
+                        {result.estatus_entrega === 'Recibido' && (
+                          <>
+                            <div>
+                              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Fecha de Recepción</span>
+                              <span className="font-bold text-[#009639]">{result.fecha_recepcion ? new Date(result.fecha_recepcion).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }) : "—"}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Recibido Por</span>
+                              <span className="font-bold text-gray-800">{result.recibido_por || "—"}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </>
                   )}
                   {result.source === 'stock' && (
                     <div className="col-span-2 pt-4 border-t border-gray-100">

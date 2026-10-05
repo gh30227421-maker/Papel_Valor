@@ -52,16 +52,9 @@ export default function TrackerSearch() {
         codigo_agencia,
         tipo,
         correlativo,
-        updated_at,
-        agencias (
-          nombre,
-          region,
-          estado,
-          zona,
-          gerente
-        )
+        updated_at
       `)
-      .or(`correlativo.eq.${termClean},correlativo.eq.${termSpaced},correlativo.ilike.%${termClean}%,correlativo.ilike.%${termSpaced}%`)
+      .in("correlativo", [termClean, termSpaced])
       .limit(1)
       .maybeSingle();
 
@@ -74,14 +67,7 @@ export default function TrackerSearch() {
           codigo_agencia,
           tipo,
           correlativo,
-          updated_at,
-          agencias (
-            nombre,
-            region,
-            estado,
-            zona,
-            gerente
-          )
+          updated_at
         `)
         .ilike('correlativo', '%-%'); // Solo traemos los rangos
 
@@ -113,7 +99,18 @@ export default function TrackerSearch() {
     }
 
     if (!stockError && stockData) {
-      setResult({ ...stockData, source: 'stock' } as any);
+      // Fetch agency manually because FK might be missing in DB
+      let agencias = { nombre: "Desconocida", region: "—", estado: "—", zona: "—", gerente: "—" };
+      if (stockData.codigo_agencia) {
+        const { data: agenciaData } = await supabase
+          .from("agencias")
+          .select("nombre, region, estado, zona, gerente")
+          .eq("codigo", stockData.codigo_agencia)
+          .single();
+        if (agenciaData) agencias = agenciaData;
+      }
+      
+      setResult({ ...stockData, agencias, source: 'stock' } as any);
       setIsSearching(false);
       return;
     }

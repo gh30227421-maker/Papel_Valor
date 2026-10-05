@@ -157,7 +157,7 @@ export default function TrackerSearch() {
         )}
 
         {result && (
-          <div className="max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4">
+          <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4">
             <div className="flex items-center mb-6">
               <div className="w-10 h-10 bg-[#009639]/10 rounded-full flex items-center justify-center mr-3">
                 <svg className="w-6 h-6 text-[#009639]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>

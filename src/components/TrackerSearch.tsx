@@ -40,8 +40,12 @@ export default function TrackerSearch() {
     setHasSearched(true);
     setResult(null);
 
+    const termClean = searchTerm.replace(/\D/g, "");
+    const termSpaced = termClean.replace(/(.{4})/g, '$1 ').trim();
+
     // 1. Primero buscamos en el stock real (físico)
-    const { data: stockData, error: stockError } = await supabase
+    // Intentamos coincidencia exacta o que contenga el número (por si está escrito con/sin espacios)
+    let { data: stockData, error: stockError } = await supabase
       .from("stock_actual")
       .select(`
         id,
@@ -57,8 +61,56 @@ export default function TrackerSearch() {
           gerente
         )
       `)
-      .eq("correlativo", searchTerm.trim())
-      .single();
+      .or(`correlativo.eq.${termClean},correlativo.eq.${termSpaced},correlativo.ilike.%${termClean}%,correlativo.ilike.%${termSpaced}%`)
+      .limit(1)
+      .maybeSingle();
+
+    // Si no hubo coincidencia directa, buscamos si está dentro de un rango (ej: A-B)
+    if (!stockData && termClean.length > 0) {
+      const { data: allStock } = await supabase
+        .from("stock_actual")
+        .select(`
+          id,
+          codigo_agencia,
+          tipo,
+          correlativo,
+          updated_at,
+          agencias (
+            nombre,
+            region,
+            estado,
+            zona,
+            gerente
+          )
+        `)
+        .ilike('correlativo', '%-%'); // Solo traemos los rangos
+
+      if (allStock) {
+        try {
+          const searchBigInt = BigInt(termClean);
+          for (const item of allStock) {
+            if (item.correlativo && item.correlativo.includes("-")) {
+              const parts = item.correlativo.split("-");
+              if (parts.length === 2) {
+                const startStr = parts[0].replace(/\D/g, '');
+                const endStr = parts[1].replace(/\D/g, '');
+                if (startStr && endStr) {
+                  const start = BigInt(startStr);
+                  const end = BigInt(endStr);
+                  if (searchBigInt >= start && searchBigInt <= end) {
+                    stockData = item;
+                    stockError = null;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // Ignorar errores de parseo BigInt
+        }
+      }
+    }
 
     if (!stockError && stockData) {
       setResult({ ...stockData, source: 'stock' } as any);
@@ -87,11 +139,10 @@ export default function TrackerSearch() {
           gerente
         )
       `)
-      .lte("correlativo_inicial", searchTerm.trim())
-      .gte("correlativo_final", searchTerm.trim())
+      .or(`and(correlativo_inicial.lte.${termClean},correlativo_final.gte.${termClean}),and(correlativo_inicial.lte.${termSpaced},correlativo_final.gte.${termSpaced})`)
       .order('fecha_despacho', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!despachoError && despachoData) {
       setResult({ ...despachoData, source: 'despacho' } as any);

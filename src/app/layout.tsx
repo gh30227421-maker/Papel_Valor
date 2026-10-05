@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Navigation from "@/components/Navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Toaster } from "sonner";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,6 +19,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Papel Valor - Operaciones",
   description: "Sistema de gestión centralizada de papel valor y tarjetas.",
+  manifest: "/manifest.json",
+  themeColor: "#FE5000",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Papel Valor",
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +48,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Navigation initialRol={serverRol} initialNombre={serverNombre} />
         {children}
         <Toaster position="top-right" richColors />
+        <Script id="register-sw" strategy="afterInteractive">
+          {`
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(
+                  function(registration) {
+                    console.log('Service Worker registration successful with scope: ', registration.scope);
+                  },
+                  function(err) {
+                    console.log('Service Worker registration failed: ', err);
+                  }
+                );
+              });
+            }
+          `}
+        </Script>
       </body>
     </html>
   );

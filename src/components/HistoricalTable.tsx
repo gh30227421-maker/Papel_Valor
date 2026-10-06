@@ -28,6 +28,36 @@ export default function HistoricalTable() {
   const [filterRegion, setFilterRegion] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
   const [filterAgency, setFilterAgency] = useState("");
+  const [filterDateStart, setFilterDateStart] = useState("");
+  const [filterDateEnd, setFilterDateEnd] = useState("");
+
+  // Modal de Detalle del Día
+  const [selectedDateModal, setSelectedDateModal] = useState<string | null>(null);
+  const [dayDispatches, setDayDispatches] = useState<any[]>([]);
+  const [loadingDay, setLoadingDay] = useState(false);
+
+  const openDayModal = async (date: string) => {
+    setSelectedDateModal(date);
+    setLoadingDay(true);
+    const { data, error } = await supabase
+      .from("despachos")
+      .select(`
+        id,
+        codigo_agencia,
+        cantidad,
+        correlativo_inicial,
+        correlativo_final,
+        estatus_entrega,
+        recibido_por,
+        fecha_recepcion,
+        agencias ( nombre )
+      `)
+      .eq('fecha_despacho', date)
+      .order('codigo_agencia', { ascending: true });
+    
+    if (data) setDayDispatches(data);
+    setLoadingDay(false);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -86,7 +116,17 @@ export default function HistoricalTable() {
     const matchRegion = filterRegion ? item.agencias?.region?.toLowerCase() === filterRegion.toLowerCase() : true;
     const matchEstado = filterEstado ? item.agencias?.estado?.toLowerCase().includes(filterEstado.toLowerCase()) : true;
     const matchAgency = filterAgency ? item.codigo_agencia.includes(filterAgency) : true;
-    return matchRegion && matchEstado && matchAgency;
+    
+    let matchDateStart = true;
+    let matchDateEnd = true;
+    if (filterDateStart) {
+      matchDateStart = item.fecha_despacho >= filterDateStart;
+    }
+    if (filterDateEnd) {
+      matchDateEnd = item.fecha_despacho <= filterDateEnd;
+    }
+
+    return matchRegion && matchEstado && matchAgency && matchDateStart && matchDateEnd;
   });
 
   return (
@@ -110,7 +150,25 @@ export default function HistoricalTable() {
       </div>
 
       {/* Filters */}
-      <div className="px-8 py-5 border-b border-gray-100 bg-gray-50 flex gap-6 flex-wrap">
+      <div className="px-8 py-5 border-b border-gray-100 bg-gray-50 flex gap-4 flex-wrap">
+        <div className="flex flex-col">
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Desde</label>
+          <input
+            type="date"
+            value={filterDateStart}
+            onChange={(e) => setFilterDateStart(e.target.value)}
+            className="w-36 px-3 py-2.5 bg-white text-gray-900 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00205B]/20 focus:border-[#00205B] outline-none text-sm font-medium shadow-sm transition-all"
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Hasta</label>
+          <input
+            type="date"
+            value={filterDateEnd}
+            onChange={(e) => setFilterDateEnd(e.target.value)}
+            className="w-36 px-3 py-2.5 bg-white text-gray-900 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00205B]/20 focus:border-[#00205B] outline-none text-sm font-medium shadow-sm transition-all"
+          />
+        </div>
         <div className="flex flex-col">
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Filtrar por Región</label>
           <CustomSelect
@@ -153,10 +211,10 @@ export default function HistoricalTable() {
         </div>
         
         {/* Clear Filters Button */}
-        {(filterRegion || filterEstado || filterAgency) && (
+        {(filterRegion || filterEstado || filterAgency || filterDateStart || filterDateEnd) && (
           <div className="flex flex-col justify-end">
              <button 
-                onClick={() => { setFilterRegion(""); setFilterEstado(""); setFilterAgency(""); }}
+                onClick={() => { setFilterRegion(""); setFilterEstado(""); setFilterAgency(""); setFilterDateStart(""); setFilterDateEnd(""); }}
                 className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-red-500 transition-colors flex items-center"
              >
                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -208,7 +266,14 @@ export default function HistoricalTable() {
                     {row.id.split('-')[0]}...
                   </td>
                   <td className="py-4 px-6 text-sm text-gray-700 font-medium">
-                    {new Date(row.fecha_despacho).toLocaleDateString('es-VE')}
+                    <button 
+                      onClick={() => openDayModal(row.fecha_despacho)}
+                      className="hover:underline text-[#00205B] font-bold flex items-center gap-1.5 transition-colors bg-blue-50 px-2 py-1 rounded hover:bg-blue-100"
+                      title="Ver todas las agencias despachadas este día"
+                    >
+                      {new Date(row.fecha_despacho).toLocaleDateString('es-VE')}
+                      <svg className="w-3.5 h-3.5 text-[#FE5000]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    </button>
                   </td>
                   <td className="py-4 px-6">
                     <span className="font-bold text-gray-900 block">{row.codigo_agencia}</span>
@@ -266,6 +331,115 @@ export default function HistoricalTable() {
           </tbody>
         </table>
       </div>
+
+      {/* MODAL DE RESUMEN DEL DÍA */}
+      {selectedDateModal && (
+        <div className="fixed inset-0 bg-[#0B132B]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header del Modal */}
+            <div className="bg-[#00205B] p-5 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-white font-black text-xl tracking-tight">Distribución del Lote Diario</h3>
+                <p className="text-blue-200 text-xs font-bold tracking-widest uppercase mt-1">
+                  FECHA: {selectedDateModal ? `${selectedDateModal.substring(8,10)}/${selectedDateModal.substring(5,7)}/${selectedDateModal.substring(0,4)}` : ""}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedDateModal(null)}
+                className="text-white/60 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="flex-1 overflow-auto p-0 bg-gray-50">
+              {loadingDay ? (
+                <div className="flex flex-col justify-center items-center h-64">
+                  <svg className="animate-spin h-8 w-8 text-[#00205B] mb-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  <span className="text-sm font-bold text-gray-500">Analizando rutas...</span>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                    <tr>
+                      <th className="py-3 px-5 font-bold text-[10px] uppercase tracking-widest text-gray-500">Agencia</th>
+                      <th className="py-3 px-5 font-bold text-[10px] uppercase tracking-widest text-gray-500 text-right">Cant.</th>
+                      <th className="py-3 px-5 font-bold text-[10px] uppercase tracking-widest text-gray-500 text-center">Estado</th>
+                      <th className="py-3 px-5 font-bold text-[10px] uppercase tracking-widest text-gray-500">Recibido Por</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {dayDispatches.map((d) => (
+                      <tr key={d.id} className="hover:bg-blue-50/50 transition-colors">
+                        <td className="py-3 px-5">
+                          <span className="font-bold text-gray-900 block">{d.codigo_agencia}</span>
+                          <span className="text-[10px] text-gray-500 uppercase tracking-wide">{d.agencias?.nombre}</span>
+                        </td>
+                        <td className="py-3 px-5 text-right font-bold text-gray-900 font-mono">
+                          {new Intl.NumberFormat("es-VE").format(d.cantidad)}
+                        </td>
+                        <td className="py-3 px-5 text-center">
+                          {d.estatus_entrega === 'Recibido' ? (
+                            <span className="inline-flex items-center px-2 py-1 text-[10px] font-bold uppercase rounded-md bg-green-100 text-green-700">
+                              <CheckCircle className="w-3 h-3 mr-1" /> Recibido
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 text-[10px] font-bold uppercase rounded-md bg-orange-100 text-orange-700">
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              En Tránsito
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-5">
+                          {d.estatus_entrega === 'Recibido' ? (
+                            <div>
+                              <span className="block font-bold text-gray-800 text-xs">{d.recibido_por || 'No registrado'}</span>
+                              {d.fecha_recepcion && (
+                                <span className="block text-[9px] text-gray-400 mt-0.5 font-mono">{new Date(d.fecha_recepcion).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">Pendiente</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {dayDispatches.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-gray-500 text-sm">No se encontraron registros detallados.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            
+            {/* Footer Resumen */}
+            {!loadingDay && dayDispatches.length > 0 && (
+              <div className="bg-gray-100 p-4 shrink-0 flex justify-between items-center border-t border-gray-200">
+                <div className="flex gap-4">
+                  <div className="text-center">
+                    <span className="block text-[10px] font-bold text-gray-500 uppercase">Total Agencias</span>
+                    <span className="font-black text-gray-800 text-lg">{dayDispatches.length}</span>
+                  </div>
+                  <div className="w-px bg-gray-300"></div>
+                  <div className="text-center">
+                    <span className="block text-[10px] font-bold text-green-600 uppercase">Recibidos</span>
+                    <span className="font-black text-green-600 text-lg">{dayDispatches.filter(d => d.estatus_entrega === 'Recibido').length}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="block text-[10px] font-bold text-gray-500 uppercase">Volumen Total TDD</span>
+                  <span className="font-black text-[#FE5000] text-xl">
+                    {new Intl.NumberFormat("es-VE").format(dayDispatches.reduce((acc, curr) => acc + curr.cantidad, 0))}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

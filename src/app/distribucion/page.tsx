@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function DistribucionModule() {
   const [activeTab, setActiveTab] = useState<"registro" | "historico" | "rastreo" | "reporte">("registro");
-  const [metrics, setMetrics] = useState({ totalLotes: 0, totalVolumen: 0 });
+  const [metrics, setMetrics] = useState({ volumenMesActual: 0, volumenMesAnterior: 0 });
 
   useEffect(() => {
     const saved = localStorage.getItem('distribucion_tab');
@@ -25,12 +25,15 @@ export default function DistribucionModule() {
 
   useEffect(() => {
     const fetchMetrics = async () => {
-      const { data, error } = await supabase.from("despachos").select("cantidad");
+      const { data, error } = await supabase.rpc("get_monthly_dispatch_metrics");
       if (!error && data) {
         setMetrics({
-          totalLotes: data.length,
-          totalVolumen: data.reduce((acc, row) => acc + row.cantidad, 0)
+          volumenMesActual: data.volumenMesActual || 0,
+          volumenMesAnterior: data.volumenMesAnterior || 0
         });
+      } else {
+        // Fallback or error logging
+        console.error("Error fetching metrics via RPC:", error);
       }
     };
     fetchMetrics();
@@ -95,17 +98,17 @@ export default function DistribucionModule() {
           {/* Metrics Pills */}
           <div className="flex gap-3 w-full lg:w-auto">
             <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
-              <div className="w-2 h-8 bg-[#009639] rounded-full"></div>
+              <div className="w-2 h-8 bg-gray-400 rounded-full"></div>
               <div>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none">Total Lotes</p>
-                <p className="text-lg font-black text-[#00205B] leading-none mt-1">{metrics.totalLotes}</p>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none">Mes Anterior</p>
+                <p className="text-lg font-black text-gray-600 leading-none mt-1">{new Intl.NumberFormat("es-VE").format(metrics.volumenMesAnterior)}</p>
               </div>
             </div>
             <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
-              <div className="w-2 h-8 bg-[#FE5000] rounded-full"></div>
+              <div className="w-2 h-8 bg-[#009639] rounded-full"></div>
               <div>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none">Volumen Despachado</p>
-                <p className="text-lg font-black text-[#00205B] leading-none mt-1">{new Intl.NumberFormat("es-VE").format(metrics.totalVolumen)}</p>
+                <p className="text-[9px] font-bold text-[#009639] uppercase tracking-widest leading-none">Mes Actual</p>
+                <p className="text-lg font-black text-[#00205B] leading-none mt-1">{new Intl.NumberFormat("es-VE").format(metrics.volumenMesActual)}</p>
               </div>
             </div>
           </div>

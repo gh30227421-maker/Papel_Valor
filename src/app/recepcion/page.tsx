@@ -43,8 +43,8 @@ export default function RecepcionPage() {
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recibidoPor.trim()) {
-      setErrorMsg('Debe indicar quién recibe el paquete.');
+    if (!recibidoPor.trim() || !observaciones.trim()) {
+      setErrorMsg('Debe indicar quién recibe el paquete y añadir una observación.');
       return;
     }
 
@@ -212,9 +212,10 @@ export default function RecepcionPage() {
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-gray-400" />
-                    Observaciones (Opcional)
+                    Observaciones (Obligatorio)
                   </label>
                   <textarea
+                    required
                     value={observaciones}
                     onChange={(e) => setObservaciones(e.target.value)}
                     placeholder="Todo recibido conforme, cajas selladas..."
@@ -234,7 +235,7 @@ export default function RecepcionPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !recibidoPor}
+                  disabled={loading || !recibidoPor || !observaciones}
                   className="flex-1 bg-[#009639] hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
                 >
                   {loading ? (
@@ -264,6 +265,7 @@ export default function RecepcionPage() {
                   setStep(1);
                   setCodigoAgencia('');
                   setCorrelativoInicial('');
+                  setCorrelativoFinal('');
                   setRecibidoPor('');
                   setObservaciones('');
                   setDespacho(null);

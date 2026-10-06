@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import useSWR from "swr";
 import LoadingOverlay from "./LoadingOverlay";
 import { getDashboardStats, getFiltrosBasicos, getMonthlyPivot, getDashboardLastUpdate, forceRefreshDashboard } from "@/actions/dashboard";
 import { 
@@ -52,8 +53,7 @@ const REGION_MAPPING: Record<string, string> = {
 };
 
 export default function DashboardStats() {
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Catálogos para filtros
   const [catYears, setCatYears] = useState<string[]>([]);
@@ -67,12 +67,7 @@ export default function DashboardStats() {
   const [selectedEstado, setSelectedEstado] = useState<string>("Todos");
   const [selectedAgencia, setSelectedAgencia] = useState<string>("");
   const [mapTab, setMapTab] = useState<"estados" | "regiones">("regiones");
-  const [pivotData, setPivotData] = useState<any[]>([]);
-  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const loadData = async () => {
-    setLoading(true);
+  const fetcher = async () => {
     const [data, pivot, lastUpdateData] = await Promise.all([
       getDashboardStats({
         year: selectedYear,
@@ -87,17 +82,25 @@ export default function DashboardStats() {
       }),
       getDashboardLastUpdate()
     ]);
-    setStats(data);
-    setPivotData(pivot);
-    setLastUpdate(lastUpdateData);
-    setLoading(false);
+    return { data, pivot, lastUpdateData };
   };
+
+  const { data: swrData, isValidating, mutate } = useSWR(
+    ["dashboard-stats", selectedYear, selectedMonth, selectedRegion, selectedAgencia],
+    fetcher,
+    { revalidateOnFocus: false, keepPreviousData: true }
+  );
+
+  const stats = swrData?.data || null;
+  const pivotData = swrData?.pivot || [];
+  const lastUpdate = swrData?.lastUpdateData || null;
+  const loading = !swrData && isValidating;
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     const success = await forceRefreshDashboard();
     if (success) {
-      await loadData();
+      await mutate();
     }
     setIsRefreshing(false);
   };
@@ -109,10 +112,6 @@ export default function DashboardStats() {
       setCatAgencias(cats.agencias);
     });
   }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [selectedYear, selectedMonth, selectedRegion, selectedEstado, selectedAgencia]);
 
   if (loading && !stats) {
     return (

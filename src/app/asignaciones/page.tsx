@@ -1,11 +1,32 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardStats from "@/components/DashboardStats";
 import DashboardStock from "@/components/DashboardStock";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function AsignacionesModule() {
-  const [activeTab, setActiveTab] = useState<"asignaciones" | "stock">("asignaciones");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") as "asignaciones" | "stock";
+  
+  const [activeTab, setActiveTab] = useState<"asignaciones" | "stock">(
+    tabFromUrl === "stock" ? "stock" : "asignaciones"
+  );
+
+  // Sync state with URL when URL changes (e.g. back button)
+  useEffect(() => {
+    if (tabFromUrl === "stock" || tabFromUrl === "asignaciones") {
+      setActiveTab(tabFromUrl);
+    } else {
+      setActiveTab("asignaciones");
+    }
+  }, [tabFromUrl]);
+
+  const handleTabChange = (tab: "asignaciones" | "stock") => {
+    setActiveTab(tab);
+    router.push(`/asignaciones?tab=${tab}`);
+  };
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#F5F7FA] flex flex-col font-sans">
@@ -32,7 +53,7 @@ export default function AsignacionesModule() {
           {/* Custom Pill Tabs */}
           <div className="flex bg-gray-100 p-1 rounded-full border border-gray-200">
             <button
-              onClick={() => setActiveTab("asignaciones")}
+              onClick={() => handleTabChange("asignaciones")}
               className={`py-2 px-6 text-xs font-bold rounded-full transition-all ${
                 activeTab === "asignaciones"
                   ? "bg-white text-[#0B132B] shadow-sm"
@@ -42,7 +63,7 @@ export default function AsignacionesModule() {
               Módulo de Asignaciones
             </button>
             <button
-              onClick={() => setActiveTab("stock")}
+              onClick={() => handleTabChange("stock")}
               className={`py-2 px-6 text-xs font-bold rounded-full transition-all ${
                 activeTab === "stock"
                   ? "bg-white text-[#0B132B] shadow-sm"

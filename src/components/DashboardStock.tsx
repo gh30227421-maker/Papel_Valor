@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import useSWR from "swr";
 import LoadingOverlay from "./LoadingOverlay";
 import { getStockStats, getDashboardStats } from "@/actions/dashboard";
 import {
@@ -55,8 +56,6 @@ const STATE_TO_REGION: Record<string, string> = {
 };
 
 export default function DashboardStock() {
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [mapTab, setMapTab] = useState<"estados" | "regiones">("regiones");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRegions, setExpandedRegions] = useState<string[]>([]);
@@ -67,22 +66,22 @@ export default function DashboardStock() {
     );
   };
 
-  const [asigTotal, setAsigTotal] = useState<number>(0);
-
-  const loadData = async () => {
-    setLoading(true);
+  const fetcher = async () => {
     const [data, asigData] = await Promise.all([
       getStockStats(""),
       getDashboardStats({ year: "2026" })
     ]);
-    setStats(data);
-    setAsigTotal(asigData.total || 0);
-    setLoading(false);
+    return { data, asigData };
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { data: swrData, isValidating } = useSWR(["dashboard-stock"], fetcher, {
+    revalidateOnFocus: false,
+    keepPreviousData: true
+  });
+
+  const stats = swrData?.data || null;
+  const asigTotal = swrData?.asigData?.total || 0;
+  const loading = !swrData && isValidating;
 
   const proyeccionData = stats?.proyeccion || [];
 

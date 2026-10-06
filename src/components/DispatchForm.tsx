@@ -236,9 +236,9 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                   <input
                     ref={agencyInputRef}
                     type="text"
-                    maxLength={4}
+                    maxLength={6}
                     value={agencyCode}
-                    onChange={(e) => setAgencyCode(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => setAgencyCode(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && agencyCode.length > 0) {
                         e.preventDefault();

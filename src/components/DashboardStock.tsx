@@ -20,7 +20,7 @@ import { Tooltip } from "react-tooltip";
 
 const geoUrl = "/venezuela.json";
 
-const COLORS = ["#00205B", "#FE5000", "#009639", "#F0B323"];
+const COLORS = ["#00205B", "#009639", "#FE5000", "#F0B323"];
 
 // Mapeo para normalizar nombres
 const normalizeString = (str: string) => {
@@ -28,15 +28,30 @@ const normalizeString = (str: string) => {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 };
 
-const REGION_MAPPING: Record<string, string[]> = {
-  "REGION CAPITAL": ["DISTRITO CAPITAL", "MIRANDA", "LA GUAIRA"],
-  "REGION CENTRAL": ["ARAGUA", "CARABOBO"],
-  "REGION CENTRO OCCIDENTE": ["LARA", "YARACUY", "FALCON"],
-  "REGION LOS LLANOS": ["COJEDES", "PORTUGUESA", "BARINAS", "APURE", "GUARICO"],
-  "REGION LOS ANDES": ["TACHIRA", "MERIDA", "TRUJILLO"],
-  "REGION ORIENTE": ["ANZOATEGUI", "SUCRE", "MONAGAS", "NUEVA ESPARTA"],
-  "REGION GUAYANA": ["BOLIVAR", "AMAZONAS", "DELTA AMACURO"],
-  "REGION ZULIA": ["ZULIA"]
+const STATE_TO_REGION: Record<string, string> = {
+  "ARAGUA": "ARAGUA - LOS LLANOS",
+  "GUARICO": "ARAGUA - LOS LLANOS",
+  "APURE": "ARAGUA - LOS LLANOS",
+  "MERIDA": "OCCIDENTE - ANDES",
+  "TACHIRA": "OCCIDENTE - ANDES",
+  "ZULIA": "OCCIDENTE - ANDES",
+  "FALCON": "OCCIDENTE - ANDES",
+  "TRUJILLO": "OCCIDENTE - ANDES",
+  "CARABOBO": "CENTRO OCCIDENTE",
+  "BARINAS": "CENTRO OCCIDENTE",
+  "LARA": "CENTRO OCCIDENTE",
+  "YARACUY": "CENTRO OCCIDENTE",
+  "COJEDES": "CENTRO OCCIDENTE",
+  "PORTUGUESA": "CENTRO OCCIDENTE",
+  "MIRANDA": "CAPITAL",
+  "LA GUAIRA": "CAPITAL",
+  "DISTRITO CAPITAL": "CAPITAL",
+  "ANZOATEGUI": "ORIENTE",
+  "SUCRE": "ORIENTE",
+  "NUEVA ESPARTA": "ORIENTE",
+  "BOLIVAR": "ORIENTE",
+  "MONAGAS": "ORIENTE",
+  "DELTA AMACURO": "ORIENTE"
 };
 
 export default function DashboardStock() {
@@ -158,8 +173,8 @@ export default function DashboardStock() {
   // Data del Gráfico de Torta (Distribución general)
   const donutData = [
     { name: "Bóveda Central", value: stock_boveda },
-    { name: "Red de Agencias", value: stock_agencias },
-    { name: "Nómina Externa", value: stock_nomina }
+    { name: "Nómina Externa", value: stock_nomina },
+    { name: "Red de Agencias", value: stock_agencias }
   ].filter(d => d.value > 0);
 
   // Top 5 para el mapa
@@ -175,25 +190,22 @@ export default function DashboardStock() {
   const getEstadoColor = (estadoName: string, value: number) => {
     if (value === 0) return "#E5E7EB"; 
     
-    let isMatched = false;
     if (mapTab === "estados") {
        const index = estadosData.findIndex(e => normalizeString(e.id).includes(normalizeString(estadoName)) || normalizeString(estadoName).includes(normalizeString(e.id)));
        if (index >= 0 && index <= 2) return "#FE5000"; 
        if (index >= 3 && index <= 4) return "#009639"; 
        if (index > 4) return "#00205B";
     } else {
-       const regionMatches = Object.entries(REGION_MAPPING).find(([region, states]) => 
-          states.some(s => normalizeString(s).includes(normalizeString(estadoName)) || normalizeString(estadoName).includes(normalizeString(s)))
-       );
-       if (regionMatches) {
-          const rName = regionMatches[0];
-          const index = regionesData.findIndex(r => normalizeString(r.name) === normalizeString(rName));
-          if (index >= 0 && index <= 2) return "#FE5000"; 
-          if (index >= 3 && index <= 4) return "#009639"; 
-          if (index > 4) return "#00205B";
+       const regionName = STATE_TO_REGION[normalizeString(estadoName)];
+       if (regionName) {
+          if (regionName === "ORIENTE") return "#00205B";
+          if (regionName === "ARAGUA - LOS LLANOS") return "#FE5000";
+          if (regionName === "CENTRO OCCIDENTE") return "#009639";
+          if (regionName === "OCCIDENTE - ANDES") return "#DC2626"; // Rojo
+          if (regionName === "CAPITAL") return "#EAB308"; // Amarillo
        }
     }
-    return "#00205B"; 
+    return "#E5E7EB"; 
   };
 
   return (
@@ -306,12 +318,11 @@ export default function DashboardStock() {
           <div className="flex-1 flex flex-col md:flex-row p-5">
             <div className="w-full md:w-3/5 h-64 md:h-auto relative">
                <ComposableMap
-                  projectionConfig={{ scale: 2800 }}
+                  projectionConfig={{ scale: 2700, center: [-66, 6.8] }}
                   projection="geoMercator"
                   style={{ width: "100%", height: "100%" }}
                 >
-                  <ZoomableGroup center={[-66.5897, 7.5]} zoom={1} minZoom={1} maxZoom={3}>
-                    <Geographies geography={geoUrl}>
+                  <Geographies geography={geoUrl}>
                       {({ geographies }) =>
                         geographies.map((geo) => {
                           const rawName = geo.properties.ESTADO || geo.properties.NAME_1 || "";
@@ -345,14 +356,25 @@ export default function DashboardStock() {
                           );
                         })
                       }
-                    </Geographies>
-                  </ZoomableGroup>
+                  </Geographies>
                 </ComposableMap>
                 <Tooltip id="map-tooltip" style={{ backgroundColor: "#0B132B", color: "#fff", fontSize: "11px", fontWeight: "bold", borderRadius: "8px", zIndex: 100 }} />
                <div className="absolute bottom-0 left-0 bg-white/90 p-2 rounded border border-gray-100 shadow-sm text-[9px] font-bold text-gray-500">
-                 <p className="flex items-center gap-1 mb-1"><span className="w-2 h-2 rounded-full bg-[#FE5000]"></span> Top 1-3</p>
-                 <p className="flex items-center gap-1 mb-1"><span className="w-2 h-2 rounded-full bg-[#009639]"></span> Top 4-5</p>
-                 <p className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#00205B]"></span> Otros</p>
+                 {mapTab === "estados" ? (
+                   <>
+                     <p className="flex items-center gap-1 mb-1"><span className="w-2 h-2 rounded-full bg-[#FE5000]"></span> Top 1-3</p>
+                     <p className="flex items-center gap-1 mb-1"><span className="w-2 h-2 rounded-full bg-[#009639]"></span> Top 4-5</p>
+                     <p className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#00205B]"></span> Otros</p>
+                   </>
+                 ) : (
+                   <>
+                     <p className="flex items-center gap-1 mb-1"><span className="w-2 h-2 rounded-full bg-[#00205B]"></span> Oriente</p>
+                     <p className="flex items-center gap-1 mb-1"><span className="w-2 h-2 rounded-full bg-[#FE5000]"></span> Aragua - Los Llanos</p>
+                     <p className="flex items-center gap-1 mb-1"><span className="w-2 h-2 rounded-full bg-[#009639]"></span> Centro Occidente</p>
+                     <p className="flex items-center gap-1 mb-1"><span className="w-2 h-2 rounded-full bg-[#DC2626]"></span> Occidente - Andes</p>
+                     <p className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#EAB308]"></span> Capital</p>
+                   </>
+                 )}
                </div>
             </div>
             
@@ -368,11 +390,20 @@ export default function DashboardStock() {
                 <div className="space-y-4 flex-1">
                   {top5DataList.map((item: any, i: number) => {
                     const idName = mapTab === "estados" ? item.id : item.name;
+                    
+                    let badgeColorClass = i < 3 ? "bg-[#FE5000]" : "bg-[#009639]";
+                    if (mapTab === "regiones") {
+                      const rName = normalizeString(idName);
+                      if (rName === "ORIENTE") badgeColorClass = "bg-[#00205B]";
+                      else if (rName === "ARAGUA - LOS LLANOS") badgeColorClass = "bg-[#FE5000]";
+                      else if (rName === "CENTRO OCCIDENTE") badgeColorClass = "bg-[#009639]";
+                      else if (rName === "OCCIDENTE - ANDES") badgeColorClass = "bg-[#DC2626]";
+                      else if (rName === "CAPITAL") badgeColorClass = "bg-[#EAB308]";
+                    }
+                    
                     return (
                       <div key={idName} className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${
-                          i < 3 ? "bg-[#FE5000]" : "bg-[#009639]"
-                        }`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${badgeColorClass}`}>
                           {i + 1}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -410,10 +441,13 @@ export default function DashboardStock() {
                         data={donutData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
+                        innerRadius={65}
+                        outerRadius={115}
                         paddingAngle={2}
                         dataKey="value"
+                        label={({ percent, value }) => `${(percent * 100).toFixed(1)}% (${value.toLocaleString('es-VE')})`}
+                        labelLine={{ stroke: '#9CA3AF', strokeWidth: 1 }}
+                        style={{ fontSize: '11px', fontWeight: 'bold' }}
                       >
                         {donutData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -421,7 +455,7 @@ export default function DashboardStock() {
                       </Pie>
                       <RechartsTooltip 
                         formatter={(value: number) => [`${value.toLocaleString("es-VE")} TDD`, "Cantidad"]}
-                        contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
+                        contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "11px", fontWeight: "bold" }}
                       />
                       <Legend 
                         verticalAlign="bottom" 
@@ -448,37 +482,39 @@ export default function DashboardStock() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Top 10 Agencias List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-[400px]">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-auto">
            <div className="p-4 border-b border-gray-100">
              <h3 className="text-sm font-bold text-[#0B132B]">Top 10 Agencias con Mayor Inventario</h3>
              <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider">Acumulado físico en Red</p>
            </div>
            <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
              {top_agencias.length > 0 ? (
-               <table className="w-full text-left border-collapse">
-                 <thead className="bg-gray-50/80 sticky top-0 backdrop-blur-sm z-10">
-                   <tr>
-                     <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">#</th>
-                     <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Agencia</th>
-                     <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Stock</th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y divide-gray-100">
-                   {top_agencias.map((ag: any, index: number) => (
-                     <tr key={index} className="hover:bg-blue-50/50 transition-colors">
-                       <td className="py-3 px-4 text-xs font-bold text-gray-400">
+               <div className="flex flex-col gap-1 p-3">
+                 {top_agencias.map((ag: any, index: number) => {
+                   const maxStock = top_agencias[0]?.value || 1;
+                   const barWidth = `${(ag.value / maxStock) * 100}%`;
+                   const colorClass = index === 0 ? "bg-[#00205B]" : index === 1 ? "bg-[#FE5000]" : index === 2 ? "bg-[#009639]" : "bg-gray-400";
+                   const textColor = index === 0 ? "text-[#00205B]" : index === 1 ? "text-[#FE5000]" : index === 2 ? "text-[#009639]" : "text-[#0B132B]";
+                   
+                   return (
+                     <div key={index} className="flex items-center gap-3 bg-gray-50/50 py-1.5 px-2 rounded hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
+                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-sm ${colorClass}`}>
                          {index + 1}
-                       </td>
-                       <td className="py-3 px-4 text-xs font-bold text-[#00205B]">
-                         {ag.name}
-                       </td>
-                       <td className="py-3 px-4 text-xs font-black text-[#FE5000] text-right">
-                         {ag.value.toLocaleString("es-VE")}
-                       </td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <p className={`text-[10px] font-black truncate leading-tight mb-1 ${textColor}`}>{ag.name}</p>
+                         <div className="w-full bg-gray-200 rounded-full h-1 overflow-hidden">
+                           <div className={`${colorClass} h-1 rounded-full`} style={{ width: barWidth }}></div>
+                         </div>
+                       </div>
+                       <div className="text-right shrink-0">
+                         <p className={`text-xs font-black leading-tight ${textColor}`}>{ag.value.toLocaleString("es-VE")}</p>
+                         <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Stock</p>
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
              ) : (
                <div className="flex h-full items-center justify-center text-xs text-gray-400 italic">
                  No hay datos en esta vista.
@@ -488,7 +524,7 @@ export default function DashboardStock() {
         </div>
 
         {/* Bar Chart Regiones */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow h-[400px]">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow h-auto">
           <div className="p-4 border-b border-gray-100">
             <h3 className="text-sm font-bold text-[#0B132B]">Distribución de Stock por Regiones</h3>
             <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider">Inventario consolidado</p>
@@ -499,7 +535,7 @@ export default function DashboardStock() {
                   <BarChart
                     data={regiones}
                     layout="vertical"
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    margin={{ top: 5, right: 60, left: 20, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f0f0f0" />
                     <XAxis type="number" hide />

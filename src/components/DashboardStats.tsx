@@ -5,7 +5,8 @@ import LoadingOverlay from "./LoadingOverlay";
 import { getDashboardStats, getFiltrosBasicos, getMonthlyPivot, getDashboardLastUpdate, forceRefreshDashboard } from "@/actions/dashboard";
 import { 
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList,
+  AreaChart, Area
 } from "recharts";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Tooltip } from "react-tooltip";
@@ -178,7 +179,7 @@ export default function DashboardStats() {
     <div className="w-full bg-[#F5F7FA] font-sans pb-12">
       
       {/* 1. BARRA DE FILTROS SUPERIOR (FULL WIDTH) */}
-      <div className="bg-white border-y border-gray-200 py-3 px-2 mb-6 w-full shadow-sm">
+      <div className="bg-white border-y border-gray-200 py-2 px-3 mb-6 w-full shadow-sm">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-2">
             
@@ -188,7 +189,7 @@ export default function DashboardStats() {
               <CustomSelect 
                 value={selectedAgencia}
                 onChange={setSelectedAgencia}
-                buttonClassName="text-[11px] py-1.5 min-h-[32px] pl-2 rounded"
+                buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
                 icon={<svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>}
                 options={[
                   { value: "", label: "Seleccionar..." },
@@ -209,7 +210,7 @@ export default function DashboardStats() {
               <CustomSelect 
                 value={selectedYear}
                 onChange={setSelectedYear}
-                buttonClassName="text-[11px] py-1.5 min-h-[32px] pl-2 rounded"
+                buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
                 icon={<svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
                 options={catYears.map(y => ({ value: y, label: y === "Todos" ? "Seleccionar..." : y }))}
               />
@@ -221,7 +222,7 @@ export default function DashboardStats() {
               <CustomSelect 
                 value={selectedMonth}
                 onChange={setSelectedMonth}
-                buttonClassName="text-[11px] py-1.5 min-h-[32px] pl-2 rounded"
+                buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
                 icon={<svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
                 options={[
                   { value: "Todos", label: "Todos" },
@@ -247,7 +248,7 @@ export default function DashboardStats() {
               <CustomSelect 
                 value={selectedRegion}
                 onChange={setSelectedRegion}
-                buttonClassName="text-[11px] py-1.5 min-h-[32px] pl-2 rounded"
+                buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
                 icon={<svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
                 options={catRegions.map(r => ({ value: r, label: r === "Todas" ? "Seleccionar..." : r }))}
               />
@@ -259,7 +260,7 @@ export default function DashboardStats() {
               <CustomSelect 
                 value={selectedEstado}
                 onChange={setSelectedEstado}
-                buttonClassName="text-[11px] py-1.5 min-h-[32px] pl-2 rounded"
+                buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
                 icon={<svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>}
                 options={[
                   { value: "Todos", label: "Seleccionar..." },
@@ -396,13 +397,12 @@ export default function DashboardStats() {
                 <Tooltip id="map-tooltip" className="z-50 font-sans font-bold text-xs shadow-xl rounded-md bg-[#00205B] text-white py-1 px-2" />
                 <ComposableMap
                   projection="geoMercator"
-                  projectionConfig={{ scale: 2600, center: [-66, 7.5] }}
+                  projectionConfig={{ scale: 2700, center: [-66, 6.8] }}
                   width={800}
                   height={600}
                   style={{ width: "100%", height: "100%", minHeight: "300px" }}
                 >
-                  <ZoomableGroup center={[-66, 7.5]} zoom={1}>
-                    <Geographies geography={geoUrl}>
+                  <Geographies geography={geoUrl}>
                       {({ geographies }) =>
                         geographies.map((geo) => {
                           const stateNameRaw = geo.properties.NAME_1 || geo.properties.name || "";
@@ -438,10 +438,12 @@ export default function DashboardStats() {
                             
                             const regionData = stats?.regiones?.find(matchRegion);
                             if (regionData && regionData.value > 0) {
-                              const index = regionesData.findIndex(matchRegion);
-                              if (index >= 0 && index <= 2) fillColor = "#FE5000"; // Top 1-3
-                              else if (index >= 3 && index <= 4) fillColor = "#009639"; // Top 4-5
-                              else fillColor = "#00205B"; // Otros activos
+                              if (regionName === "ORIENTE") fillColor = "#00205B";
+                              else if (regionName === "ARAGUA - LOS LLANOS") fillColor = "#FE5000";
+                              else if (regionName === "CENTRO OCCIDENTE") fillColor = "#009639";
+                              else if (regionName === "OCCIDENTE - ANDES") fillColor = "#DC2626"; // Rojo
+                              else if (regionName === "CAPITAL") fillColor = "#EAB308"; // Amarillo
+                              else fillColor = "#9CA3AF";
                             }
                           } else {
                             if (value > 0) {
@@ -474,18 +476,27 @@ export default function DashboardStats() {
                           );
                         })
                       }
-                    </Geographies>
-                  </ZoomableGroup>
+                  </Geographies>
                 </ComposableMap>
 
-                <div className="absolute bottom-0 left-0 bg-white shadow-sm border border-gray-100 rounded-xl p-3 z-10 w-36">
+                <div className="absolute bottom-0 left-0 bg-white shadow-sm border border-gray-100 rounded-xl p-3 z-10 w-44">
                   <h4 className="text-[10px] font-bold text-[#00205B] mb-2">Mapa de Captación</h4>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#FE5000] mr-2"></span> Top 1-3</div>
-                    <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#009639] mr-2"></span> Top 4-5</div>
-                    <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#00205B] mr-2"></span> Otros Activos</div>
-                    <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#E5E7EB] mr-2"></span> Sin Operativos</div>
-                  </div>
+                  {mapTab === "estados" ? (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#FE5000] mr-2 shrink-0"></span> Top 1-3</div>
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#009639] mr-2 shrink-0"></span> Top 4-5</div>
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#00205B] mr-2 shrink-0"></span> Otros Activos</div>
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#E5E7EB] mr-2 shrink-0"></span> Sin Operativos</div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#00205B] mr-2 shrink-0"></span> Oriente</div>
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#FE5000] mr-2 shrink-0"></span> Aragua - Los Llanos</div>
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#009639] mr-2 shrink-0"></span> Centro Occidente</div>
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#DC2626] mr-2 shrink-0"></span> Occidente - Andes</div>
+                      <div className="flex items-center text-[10px] font-medium text-gray-600"><span className="w-3 h-3 rounded-md bg-[#EAB308] mr-2 shrink-0"></span> Capital</div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -502,8 +513,18 @@ export default function DashboardStats() {
                   {top5DataList.map((item: any, index: number) => {
                     const percentage = Math.round((item.value / (totalTDD || 1)) * 100);
                     const isTop3 = index < 3;
-                    const accentClass = isTop3 ? "text-[#FE5000]" : "text-[#009639]";
-                    const bgClass = isTop3 ? "bg-[#FE5000]" : "bg-[#009639]";
+                    
+                    let bgClass = isTop3 ? "bg-[#FE5000]" : "bg-[#009639]";
+                    let accentClass = isTop3 ? "text-[#FE5000]" : "text-[#009639]";
+                    
+                    if (mapTab === "regiones") {
+                      const rName = normalizeString(item.name || item.id);
+                      if (rName === "ORIENTE") { bgClass = "bg-[#00205B]"; accentClass = "text-[#00205B]"; }
+                      else if (rName === "ARAGUA - LOS LLANOS") { bgClass = "bg-[#FE5000]"; accentClass = "text-[#FE5000]"; }
+                      else if (rName === "CENTRO OCCIDENTE") { bgClass = "bg-[#009639]"; accentClass = "text-[#009639]"; }
+                      else if (rName === "OCCIDENTE - ANDES") { bgClass = "bg-[#DC2626]"; accentClass = "text-[#DC2626]"; }
+                      else if (rName === "CAPITAL") { bgClass = "bg-[#EAB308]"; accentClass = "text-[#EAB308]"; }
+                    }
 
                     return (
                       <div key={index} className="bg-white border border-gray-200 rounded-xl p-2.5 flex items-center shadow-sm hover:shadow-md transition-shadow">
@@ -668,56 +689,117 @@ export default function DashboardStats() {
           
         </div>
 
-        {/* 5. TABLA DINÁMICA MENSUAL */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mt-4">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h2 className="text-base font-bold text-[#00205B] leading-tight uppercase">Tabla de Asignaciones por Mes</h2>
-              <p className="text-[10px] text-gray-400 mt-0.5">Desglose mensualizado de transacciones</p>
+        {/* 5. CRECIMIENTO MENSUAL Y TABLA */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+          
+          {/* GRÁFICO DE ÁREA */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col min-w-0">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-base font-bold text-[#00205B] leading-tight uppercase">Tendencia de Crecimiento</h2>
+                <p className="text-[10px] text-gray-400 mt-0.5">Evolución mensual de asignaciones por tipo de TDD</p>
+              </div>
+            </div>
+            
+            <div className="flex-1 w-full h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart 
+                  data={pivotData.map(row => ({
+                    ...row,
+                    monthName: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][row.mes - 1]
+                  }))} 
+                  margin={{ top: 20, right: 20, left: -10, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00205B" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#00205B" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis 
+                    dataKey="monthName" 
+                    tick={{ fontSize: 10, fill: "#9CA3AF", fontWeight: "bold" }} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    dy={10}
+                  />
+                  <YAxis 
+                    tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val} 
+                    tick={{ fontSize: 10, fill: "#9CA3AF", fontWeight: "bold" }} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    dx={-10}
+                  />
+                  <RechartsTooltip 
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #f3f4f6', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', fontSize: '11px', fontWeight: 'bold', padding: '12px' }}
+                    formatter={(value: number) => [new Intl.NumberFormat('es-VE').format(value), "Total General"]}
+                    labelStyle={{ color: '#0B132B', marginBottom: '4px' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="total" 
+                    stroke="#00205B" 
+                    strokeWidth={3} 
+                    fill="url(#colorTotal)" 
+                    activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2, fill: '#00205B' }} 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
-          
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
-            <table className="w-full text-left text-xs text-gray-600">
-              <thead className="bg-[#00205B] text-white font-bold text-[10px] tracking-wider uppercase">
-                <tr>
-                  <th className="px-4 py-3 border-r border-[#2d3a5c]">Mes</th>
-                  <th className="px-4 py-3 border-r border-[#2d3a5c] text-right">Primera Vez</th>
-                  <th className="px-4 py-3 border-r border-[#2d3a5c] text-right">Reposición</th>
-                  <th className="px-4 py-3 border-r border-[#2d3a5c] text-right">Migración BNC</th>
-                  <th className="px-4 py-3 border-r border-[#2d3a5c] text-right">Migración BOD</th>
-                  <th className="px-4 py-3 border-r border-[#2d3a5c] text-right">TDD Pensionado</th>
-                  <th className="px-4 py-3 text-right text-[#FE5000]">Total General</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {pivotData.map((row: any) => {
-                  const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-                  return (
-                    <tr key={row.mes} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-[#0B132B] border-r border-gray-100">{monthNames[row.mes - 1]}</td>
-                      <td className="px-4 py-3 text-right font-medium border-r border-gray-100">{row.primeraVez.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-medium border-r border-gray-100">{row.reposicion.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-medium border-r border-gray-100">{row.migracionBNC.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-medium border-r border-gray-100">{row.migracionBOD.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-medium border-r border-gray-100">{row.pensionado.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-black text-[#00205B]">{row.total.toLocaleString()}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot className="bg-gray-100 font-black text-[#0B132B]">
-                <tr>
-                  <td className="px-4 py-3 border-r border-gray-200 text-right uppercase tracking-widest text-[10px]">Gran Total</td>
-                  <td className="px-4 py-3 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.primeraVez, 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.reposicion, 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.migracionBNC, 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.migracionBOD, 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.pensionado, 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right text-[#FE5000]">{pivotData.reduce((acc, r) => acc + r.total, 0).toLocaleString()}</td>
-                </tr>
-              </tfoot>
-            </table>
+
+          {/* TABLA DINÁMICA MENSUAL */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col min-w-0">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-base font-bold text-[#00205B] leading-tight uppercase">Tabla de Asignaciones por Mes</h2>
+                <p className="text-[10px] text-gray-400 mt-0.5">Desglose mensualizado de transacciones</p>
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full text-left text-[11px] text-gray-600">
+                <thead className="bg-[#00205B] text-white font-bold text-[9px] tracking-wider uppercase">
+                  <tr>
+                    <th className="px-3 py-3 border-r border-[#2d3a5c] whitespace-nowrap">Mes</th>
+                    <th className="px-3 py-3 border-r border-[#2d3a5c] text-right whitespace-nowrap">Prim. Vez</th>
+                    <th className="px-3 py-3 border-r border-[#2d3a5c] text-right whitespace-nowrap">Repo.</th>
+                    <th className="px-3 py-3 border-r border-[#2d3a5c] text-right whitespace-nowrap">Mig BNC</th>
+                    <th className="px-3 py-3 border-r border-[#2d3a5c] text-right whitespace-nowrap">Mig BOD</th>
+                    <th className="px-3 py-3 border-r border-[#2d3a5c] text-right whitespace-nowrap">Pens.</th>
+                    <th className="px-3 py-3 text-right text-[#FE5000] whitespace-nowrap">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {pivotData.map((row: any) => {
+                    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                    return (
+                      <tr key={row.mes} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-3 py-2.5 font-bold text-[#0B132B] border-r border-gray-100">{monthNames[row.mes - 1]}</td>
+                        <td className="px-3 py-2.5 text-right font-medium border-r border-gray-100">{row.primeraVez.toLocaleString()}</td>
+                        <td className="px-3 py-2.5 text-right font-medium border-r border-gray-100">{row.reposicion.toLocaleString()}</td>
+                        <td className="px-3 py-2.5 text-right font-medium border-r border-gray-100">{row.migracionBNC.toLocaleString()}</td>
+                        <td className="px-3 py-2.5 text-right font-medium border-r border-gray-100">{row.migracionBOD.toLocaleString()}</td>
+                        <td className="px-3 py-2.5 text-right font-medium border-r border-gray-100">{row.pensionado.toLocaleString()}</td>
+                        <td className="px-3 py-2.5 text-right font-black text-[#00205B]">{row.total.toLocaleString()}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-gray-100 font-black text-[#0B132B]">
+                  <tr>
+                    <td className="px-3 py-2.5 border-r border-gray-200 text-right uppercase tracking-widest text-[9px]">Total</td>
+                    <td className="px-3 py-2.5 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.primeraVez, 0).toLocaleString()}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.reposicion, 0).toLocaleString()}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.migracionBNC, 0).toLocaleString()}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.migracionBOD, 0).toLocaleString()}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-200 text-right">{pivotData.reduce((acc, r) => acc + r.pensionado, 0).toLocaleString()}</td>
+                    <td className="px-3 py-2.5 text-right text-[#FE5000]">{pivotData.reduce((acc, r) => acc + r.total, 0).toLocaleString()}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
         </div>
       </div>

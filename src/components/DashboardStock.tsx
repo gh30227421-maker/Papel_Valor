@@ -57,7 +57,7 @@ const STATE_TO_REGION: Record<string, string> = {
 export default function DashboardStock() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [mapTab, setMapTab] = useState<"estados" | "regiones">("estados");
+  const [mapTab, setMapTab] = useState<"estados" | "regiones">("regiones");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRegions, setExpandedRegions] = useState<string[]>([]);
 
@@ -214,75 +214,75 @@ export default function DashboardStock() {
       {/* 2. TARJETAS KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start hover:shadow-md transition-shadow">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">STOCK TOTAL GLOBAL</p>
-            <h2 className="text-3xl font-black text-[#0B132B]">{stock_global.toLocaleString("es-VE")}</h2>
-            <p className="text-xs text-gray-400 mt-1 font-medium">Volumen consolidado</p>
+            <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">STOCK TOTAL GLOBAL</h3>
+            <p className="text-2xl font-black text-[#00205B] leading-none">{stock_global.toLocaleString("es-VE")}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Volumen consolidado</p>
           </div>
-          <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center text-[#00205B]">
-             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+          <div className="w-8 h-8 rounded bg-blue-50 text-[#00205B] flex items-center justify-center shrink-0">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start hover:shadow-md transition-shadow">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">BÓVEDA CENTRAL</p>
-            <h2 className="text-3xl font-black text-[#0B132B]">{stock_boveda.toLocaleString("es-VE")}</h2>
-            <p className="text-xs text-gray-400 mt-1 font-medium">Centro de Costo 95</p>
+            <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">BÓVEDA CENTRAL</h3>
+            <p className="text-2xl font-black text-[#00205B] leading-none">{stock_boveda.toLocaleString("es-VE")}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Centro de Costo 95</p>
           </div>
-          <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center text-[#009639]">
-             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+          <div className="w-8 h-8 rounded bg-green-50 text-[#009639] flex items-center justify-center shrink-0">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start hover:shadow-md transition-shadow">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">RED DE AGENCIAS</p>
-            <h2 className="text-3xl font-black text-[#0B132B]">{stock_agencias.toLocaleString("es-VE")}</h2>
-            <p className="text-xs text-gray-400 mt-1 font-medium">Oficinas Comerciales</p>
+            <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">RED DE AGENCIAS</h3>
+            <p className="text-2xl font-black text-[#00205B] leading-none">{stock_agencias.toLocaleString("es-VE")}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Oficinas Comerciales</p>
           </div>
-          <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center text-[#FE5000]">
-             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          <div className="w-8 h-8 rounded bg-orange-50 text-[#FE5000] flex items-center justify-center shrink-0">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start hover:shadow-md transition-shadow">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">NÓMINA EXTERNA</p>
-            <h2 className="text-3xl font-black text-[#0B132B]">{stock_nomina.toLocaleString("es-VE")}</h2>
-            <p className="text-xs text-gray-400 mt-1 font-medium">Centro de Costo 743</p>
+            <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">NÓMINA EXTERNA</h3>
+            <p className="text-2xl font-black text-[#00205B] leading-none">{stock_nomina.toLocaleString("es-VE")}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Centro de Costo 743</p>
           </div>
-          <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center text-purple-600">
-             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+          <div className="w-8 h-8 rounded bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start hover:shadow-md transition-shadow">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">PROM. ASIGNACIÓN (20D)</p>
+            <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">PROM. ASIGNACIÓN (20D)</h3>
             <div className="flex items-end">
-              <h2 className="text-3xl font-black text-[#0B132B]">{promedioAsignacion20.toLocaleString("es-VE")}</h2>
-              <span className="text-[10px] font-bold text-gray-400 ml-1 mb-1">/ día</span>
+              <p className="text-2xl font-black text-[#00205B] leading-none">{promedioAsignacion20.toLocaleString("es-VE")}</p>
+              <span className="text-[9px] font-bold text-gray-400 ml-1 mb-0.5">/ día</span>
             </div>
-            <p className="text-xs text-gray-400 mt-1 font-medium">Base 20 días hábiles</p>
+            <p className="text-[10px] text-gray-400 mt-1">Base 20 días hábiles</p>
           </div>
-          <div className="w-12 h-12 bg-teal-50 rounded-lg flex items-center justify-center text-teal-600">
-             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+          <div className="w-8 h-8 rounded bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start hover:shadow-md transition-shadow">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">DÍAS DE STOCK</p>
+            <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">DÍAS DE STOCK</h3>
             <div className="flex items-end">
-              <h2 className="text-3xl font-black text-[#FE5000]">{diasDeStock.toLocaleString("es-VE")}</h2>
-              <span className="text-[10px] font-bold text-gray-400 ml-1 mb-1">días</span>
+              <p className="text-2xl font-black text-[#FE5000] leading-none">{diasDeStock.toLocaleString("es-VE")}</p>
+              <span className="text-[9px] font-bold text-gray-400 ml-1 mb-0.5">días</span>
             </div>
-            <p className="text-xs text-gray-400 mt-1 font-medium">Cobertura Global</p>
+            <p className="text-[10px] text-gray-400 mt-1">Cobertura Global</p>
           </div>
-          <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center text-red-500">
-             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div className="w-8 h-8 rounded bg-red-50 text-red-500 flex items-center justify-center shrink-0">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
 
@@ -299,18 +299,18 @@ export default function DashboardStock() {
             </div>
             <div className="flex bg-gray-50 p-1 rounded-md border border-gray-200">
               <button 
-                onClick={() => setMapTab("estados")}
-                className={`px-3 py-1 text-[10px] font-bold rounded flex items-center gap-1 ${mapTab === "estados" ? "bg-white text-[#0B132B] shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                Por Estados
-              </button>
-              <button 
                 onClick={() => setMapTab("regiones")}
                 className={`px-3 py-1 text-[10px] font-bold rounded flex items-center gap-1 ${mapTab === "regiones" ? "bg-white text-[#0B132B] shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                 Por Regiones
+              </button>
+              <button 
+                onClick={() => setMapTab("estados")}
+                className={`px-3 py-1 text-[10px] font-bold rounded flex items-center gap-1 ${mapTab === "estados" ? "bg-white text-[#0B132B] shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Por Estados
               </button>
             </div>
           </div>
@@ -529,36 +529,46 @@ export default function DashboardStock() {
             <h3 className="text-sm font-bold text-[#0B132B]">Distribución de Stock por Regiones</h3>
             <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider">Inventario consolidado</p>
           </div>
-          <div className="flex-1 p-5 min-h-0">
+           <div className="flex-1 min-h-0 relative flex flex-col justify-center py-4">
              {regiones.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={300}>
                   <BarChart
                     data={regiones}
                     layout="vertical"
-                    margin={{ top: 5, right: 60, left: 20, bottom: 5 }}
+                    margin={{ top: 10, right: 40, left: 20, bottom: 5 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f0f0f0" />
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#F3F4F6" />
                     <XAxis type="number" hide />
                     <YAxis 
                       dataKey="name" 
                       type="category" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fill: '#6b7280', fontSize: 10, fontWeight: 'bold' }} 
-                      width={100}
+                      tick={{ fill: '#6B7280', fontSize: 9, fontWeight: 'bold' }} 
+                      width={110}
                     />
                     <RechartsTooltip 
-                      cursor={{ fill: '#f8fafc' }}
+                      cursor={{ fill: '#F9FAFB' }}
                       formatter={(value: number) => [`${value.toLocaleString("es-VE")}`, "Stock"]}
                       contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
                     />
                     <Bar 
                       dataKey="value" 
-                      fill="#00205B" 
                       radius={[0, 4, 4, 0]}
-                      barSize={20}
+                      maxBarSize={32}
                     >
                       <LabelList dataKey="value" position="right" fill="#0B132B" fontSize={10} fontWeight="bold" formatter={(val: number) => val.toLocaleString("es-VE")} />
+                      {regiones.map((entry: any, index: number) => {
+                        const rName = normalizeString(entry.name);
+                        let fillColor = "#00205B";
+                        if (rName === "ORIENTE") fillColor = "#00205B";
+                        else if (rName === "ARAGUA - LOS LLANOS") fillColor = "#FE5000";
+                        else if (rName === "CENTRO OCCIDENTE") fillColor = "#009639";
+                        else if (rName === "OCCIDENTE - ANDES") fillColor = "#DC2626";
+                        else if (rName === "CAPITAL") fillColor = "#EAB308";
+                        else if (rName === "NOMINA EXTERNA") fillColor = "#8B5CF6";
+                        return <Cell key={`cell-${index}`} fill={fillColor} />;
+                      })}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>

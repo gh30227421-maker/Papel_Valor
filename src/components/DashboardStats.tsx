@@ -66,7 +66,7 @@ export default function DashboardStats() {
   const [selectedRegion, setSelectedRegion] = useState<string>("Todas");
   const [selectedEstado, setSelectedEstado] = useState<string>("Todos");
   const [selectedAgencia, setSelectedAgencia] = useState<string>("");
-  const [mapTab, setMapTab] = useState<"estados" | "regiones">("estados");
+  const [mapTab, setMapTab] = useState<"estados" | "regiones">("regiones");
   const [pivotData, setPivotData] = useState<any[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -375,18 +375,18 @@ export default function DashboardStats() {
               </div>
               <div className="flex space-x-1 bg-slate-50 p-1 rounded-md border border-gray-100">
                 <button 
-                  onClick={() => setMapTab("estados")}
-                  className={`px-3 py-1 rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors ${mapTab === "estados" ? "bg-white shadow-sm text-[#00205B] border border-gray-200" : "text-gray-500 hover:bg-gray-100"}`}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  Por Estados
-                </button>
-                <button 
                   onClick={() => setMapTab("regiones")}
                   className={`px-3 py-1 rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors ${mapTab === "regiones" ? "bg-white shadow-sm text-[#00205B] border border-gray-200" : "text-gray-500 hover:bg-gray-100"}`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                   Por Regiones
+                </button>
+                <button 
+                  onClick={() => setMapTab("estados")}
+                  className={`px-3 py-1 rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors ${mapTab === "estados" ? "bg-white shadow-sm text-[#00205B] border border-gray-200" : "text-gray-500 hover:bg-gray-100"}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  Por Estados
                 </button>
               </div>
             </div>
@@ -607,34 +607,42 @@ export default function DashboardStats() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           
           {/* COLUMNA IZQUIERDA: GRÁFICO DE BARRAS POR REGIONES */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col h-[400px]">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col h-auto">
              <div className="flex justify-between items-start mb-4 shrink-0">
               <div>
                 <h2 className="text-base font-bold text-[#00205B] leading-tight">Distribución por Regiones</h2>
                 <p className="text-[10px] text-gray-400 mt-0.5">Volumen total de asignaciones TDD por región</p>
               </div>
             </div>
-            <div className="flex-1 min-h-0 relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={regionesData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E5E7EB" />
+            <div className="flex-1 min-h-0 relative flex flex-col justify-center py-4">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={regionesData} margin={{ top: 10, right: 40, left: 20, bottom: 5 }} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#F3F4F6" />
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#00205B', fontWeight: 'bold' }} width={120} />
+                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#6B7280', fontWeight: 'bold' }} width={110} />
                   <RechartsTooltip 
                     formatter={(value: number) => [value.toLocaleString(), "TDDs"]}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
-                    cursor={{fill: '#F5F7FA'}}
+                    cursor={{fill: '#F9FAFB'}}
                   />
-                  <Bar dataKey="value" fill="#00205B" radius={[0, 4, 4, 0]} barSize={20}>
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={32}>
                     <LabelList 
                       dataKey="value" 
                       position="right" 
                       formatter={(val: number) => val.toLocaleString()} 
-                      style={{ fontSize: '10px', fontWeight: 'bold', fill: '#00205B' }} 
+                      style={{ fontSize: '10px', fontWeight: 'bold', fill: '#0B132B' }} 
                     />
-                    {regionesData.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
+                    {regionesData.map((entry: any, index: number) => {
+                      const rName = normalizeString(entry.name);
+                      let fillColor = "#00205B";
+                      if (rName === "ORIENTE") fillColor = "#00205B";
+                      else if (rName === "ARAGUA - LOS LLANOS") fillColor = "#FE5000";
+                      else if (rName === "CENTRO OCCIDENTE") fillColor = "#009639";
+                      else if (rName === "OCCIDENTE - ANDES") fillColor = "#DC2626";
+                      else if (rName === "CAPITAL") fillColor = "#EAB308";
+                      else if (rName === "NOMINA EXTERNA") fillColor = "#8B5CF6";
+                      return <Cell key={`cell-${index}`} fill={fillColor} />;
+                    })}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -642,49 +650,46 @@ export default function DashboardStats() {
           </div>
 
           {/* COLUMNA DERECHA: TOP 10 AGENCIAS */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col h-[400px]">
-            <div className="flex justify-between items-start mb-4 shrink-0">
-              <div>
-                <h2 className="text-base font-bold text-[#00205B] leading-tight uppercase">Top 10 Agencias con mayor volumen de asignaciones</h2>
-                <p className="text-[10px] text-gray-400 mt-0.5">Agencias con mayor volumen de asignaciones</p>
-              </div>
-            </div>
-            
-            <div className="space-y-2 flex-1 overflow-y-auto pr-1">
-              {((stats?.top_agencias || stats?.agencias || []).slice(0, 10)).map((agencia: any, index: number) => {
-                const percentage = Math.round((agencia.value / (totalTDD || 1)) * 100);
-                const isTop3 = index < 3;
-                const accentClass = isTop3 ? "text-[#FE5000]" : "text-[#009639]";
-                const bgClass = isTop3 ? "bg-[#FE5000]" : "bg-[#009639]";
-                
-                // Formateamos el nombre de la agencia para evitar desbordes
-                const nombreAgencia = agencia.name || agencia.id || agencia.codigo || "Desconocida";
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-auto">
+             <div className="p-4 border-b border-gray-100 shrink-0">
+               <h3 className="text-sm font-bold text-[#0B132B] uppercase">Top 10 Agencias con mayores asignaciones</h3>
+               <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider">Acumulado histórico de asignaciones</p>
+             </div>
+             <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+              {((stats?.top_agencias || stats?.agencias || [])?.length > 0) ? (
+                <div className="flex flex-col gap-1 p-3">
+                  {((stats?.top_agencias || stats?.agencias || []).slice(0, 10)).map((agencia: any, index: number) => {
+                    const topAgencias = (stats?.top_agencias || stats?.agencias || []).slice(0, 10);
+                    const maxAsig = topAgencias[0]?.value || 1;
+                    const barWidth = `${(agencia.value / maxAsig) * 100}%`;
+                    const colorClass = index === 0 ? "bg-[#00205B]" : index === 1 ? "bg-[#FE5000]" : index === 2 ? "bg-[#009639]" : "bg-gray-400";
+                    const textColor = index === 0 ? "text-[#00205B]" : index === 1 ? "text-[#FE5000]" : index === 2 ? "text-[#009639]" : "text-[#0B132B]";
+                    
+                    const nombreAgencia = agencia.name || agencia.id || agencia.codigo || "Desconocida";
 
-                return (
-                  <div key={index} className="bg-white border border-gray-200 rounded-xl p-2.5 flex items-center shadow-sm hover:shadow-md transition-shadow">
-                    <div className={`w-6 h-6 rounded flex items-center justify-center text-[11px] font-black text-white mr-3 shrink-0 ${bgClass}`}>
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-[11px] font-black text-[#00205B] leading-none uppercase truncate mb-1" title={nombreAgencia}>
-                        {nombreAgencia}
-                      </h4>
-                      <p className="text-[9px] text-gray-400">Asignaciones TDD</p>
-                    </div>
-                    <div className="text-right ml-2 flex flex-col items-end">
-                      <div className="flex items-end mb-0.5">
-                        <p className="text-[12px] font-black text-[#00205B] leading-none">{agencia.value.toLocaleString()}</p>
-                        <span className="text-[8px] text-gray-400 ml-0.5 mb-0.5">TDD</span>
+                    return (
+                      <div key={index} className="flex items-center gap-3 bg-gray-50/50 py-1.5 px-2 rounded hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-sm ${colorClass}`}>
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[10px] font-black truncate leading-tight mb-1 ${textColor}`} title={nombreAgencia}>{nombreAgencia}</p>
+                          <div className="w-full bg-gray-200 rounded-full h-1 overflow-hidden">
+                            <div className={`${colorClass} h-1 rounded-full`} style={{ width: barWidth }}></div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={`text-xs font-black leading-tight ${textColor}`}>{agencia.value.toLocaleString("es-VE")}</p>
+                          <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">TDD</p>
+                        </div>
                       </div>
-                      <p className={`text-[11px] font-black ${accentClass}`}>{percentage}%</p>
-                    </div>
-                  </div>
-                );
-              })}
-              {((stats?.top_agencias || stats?.agencias || [])?.length === 0) && (
-                <div className="text-[11px] text-gray-400 italic text-center py-4">No hay datos de agencias.</div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs text-gray-400 italic">No hay datos de agencias.</div>
               )}
-            </div>
+             </div>
           </div>
           
         </div>

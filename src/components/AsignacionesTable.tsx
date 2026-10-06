@@ -166,7 +166,10 @@ export default function AsignacionesTable() {
               data.map((row) => (
                 <tr key={row.id} className="hover:bg-blue-50/50 transition-colors">
                   <td className="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">
-                    {new Date(row.fecha_cod).toLocaleDateString('es-VE')}
+                    {/* Evitar el desfase de zona horaria extrayendo directamente de YYYY-MM-DD */}
+                    {row.fecha_cod 
+                      ? `${row.fecha_cod.substring(8,10)}/${row.fecha_cod.substring(5,7)}/${row.fecha_cod.substring(0,4)}`
+                      : "—"}
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center">

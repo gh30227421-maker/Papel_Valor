@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import CustomSelect from "./ui/CustomSelect";
 import { toast } from "sonner";
+import { CheckCircle } from "lucide-react";
 
 type DespachoItem = {
   id: string;

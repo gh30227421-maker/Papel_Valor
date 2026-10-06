@@ -32,9 +32,10 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login')
+  const isPublicPage = request.nextUrl.pathname.startsWith('/recepcion')
 
-  if (!user && !isAuthPage) {
-    // Si no está autenticado y no está en /login, redirigir a /login
+  if (!user && !isAuthPage && !isPublicPage) {
+    // Si no está autenticado y no está en /login o /recepcion, redirigir a /login
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

@@ -38,6 +38,10 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
   };
 
   const agencyInputRef = useRef<HTMLInputElement>(null);
+  const initialCorrelativeRef = useRef<HTMLInputElement>(null);
+  const finalCorrelativeRef = useRef<HTMLInputElement>(null);
+  const despacharBtnRef = useRef<HTMLButtonElement>(null);
+  const confirmBtnRef = useRef<HTMLButtonElement>(null);
 
   const isValidInitial = initialCorrelative.length === 16 && /^\d+$/.test(initialCorrelative);
   const isValidFinal = finalCorrelative.length === 16 && /^\d+$/.test(finalCorrelative);
@@ -152,11 +156,12 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
     setAgencyData(null);
     setInitialCorrelative("");
     setFinalCorrelative("");
-    setElaborator("");
+    // setElaborator(""); // <-- Mantenemos el elaborador seleccionado
     
-    if (onSuccess) {
-      setTimeout(onSuccess, 2000);
-    }
+    // Ya no navegamos al histórico, nos quedamos en el formulario
+    // if (onSuccess) {
+    //   setTimeout(onSuccess, 2000);
+    // }
     
     setTimeout(() => {
       setSuccessMessage("");
@@ -234,6 +239,12 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                     maxLength={4}
                     value={agencyCode}
                     onChange={(e) => setAgencyCode(e.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && agencyCode.length > 0) {
+                        e.preventDefault();
+                        initialCorrelativeRef.current?.focus();
+                      }
+                    }}
                     className={`w-full pl-8 pr-2 py-1.5 bg-white text-gray-900 border-2 rounded outline-none transition-all font-bold text-sm tracking-wide ${
                       agencyData ? "border-[#009639]" : agencyError ? "border-red-400 focus:border-red-500" : "border-gray-300 focus:border-[#00205B]"
                     }`}
@@ -286,9 +297,16 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                 </div>
                 <div className="relative">
                   <input
+                    ref={initialCorrelativeRef}
                     type="text"
                     value={initialCorrelative}
                     onChange={handleCorrelativeChange(setInitialCorrelative)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && initialCorrelative.length === 16) {
+                        e.preventDefault();
+                        finalCorrelativeRef.current?.focus();
+                      }
+                    }}
                     className="w-full pl-10 pr-12 py-3 bg-gray-50 text-gray-900 font-mono text-lg font-bold tracking-[0.2em] border-2 border-gray-200 rounded focus:ring-0 focus:border-[#00205B] outline-none transition-all"
                     placeholder="0000000000000000"
                   />
@@ -325,9 +343,16 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                 </div>
                 <div className="relative">
                   <input
+                    ref={finalCorrelativeRef}
                     type="text"
                     value={finalCorrelative}
                     onChange={handleCorrelativeChange(setFinalCorrelative)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && finalCorrelative.length === 16 && isFormValid) {
+                        e.preventDefault();
+                        despacharBtnRef.current?.focus();
+                      }
+                    }}
                     className="w-full pl-10 pr-12 py-3 bg-gray-50 text-gray-900 font-mono text-lg font-bold tracking-[0.2em] border-2 border-gray-200 rounded focus:ring-0 focus:border-[#00205B] outline-none transition-all"
                     placeholder="0000000000000000"
                   />
@@ -376,9 +401,13 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
         {/* Action Button */}
         <div className="flex justify-end pt-2">
           <button
+            ref={despacharBtnRef}
             type="button"
             disabled={!isFormValid}
-            onClick={() => setShowPreview(true)}
+            onClick={() => {
+              setShowPreview(true);
+              setTimeout(() => confirmBtnRef.current?.focus(), 100);
+            }}
             className="group relative px-8 py-3 bg-[#FE5000] text-white font-black text-sm rounded shadow-[0_4px_10px_-4px_rgba(254,80,0,0.6)] hover:shadow-[0_6px_15px_-5px_rgba(254,80,0,0.8)] focus:ring-4 focus:ring-[#FE5000]/40 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed transition-all overflow-hidden"
           >
             <span className="relative z-10 flex items-center tracking-wider uppercase">
@@ -409,7 +438,11 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
               <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
                 <div className="flex justify-between border-b border-gray-200 pb-2 border-dashed">
                   <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Fecha</span>
-                  <span className="font-black text-gray-900">{new Date(dispatchDate).toLocaleDateString('es-VE')}</span>
+                  <span className="font-black text-gray-900">
+                    {dispatchDate 
+                      ? `${dispatchDate.substring(8,10)}/${dispatchDate.substring(5,7)}/${dispatchDate.substring(0,4)}` 
+                      : ""}
+                  </span>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-2 border-dashed">
                   <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Operador</span>
@@ -469,9 +502,10 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                 Cancelar
               </button>
               <button
+                ref={confirmBtnRef}
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="w-2/3 py-3 bg-[#009639] text-white font-black text-sm uppercase tracking-wider rounded-lg shadow-md hover:bg-[#007A2E] disabled:opacity-50 transition-all flex justify-center items-center"
+                className="w-2/3 py-3 bg-[#009639] text-white font-black text-sm uppercase tracking-wider rounded-lg shadow-md hover:bg-[#007A2E] focus:ring-4 focus:ring-[#009639]/40 disabled:opacity-50 transition-all flex justify-center items-center"
               >
                 {isSubmitting ? (
                   <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">

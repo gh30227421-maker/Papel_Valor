@@ -6,21 +6,23 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const mapIntFilter = (arr?: string[]) => {
+const mapIntFilter = (arr?: string[] | string) => {
   if (!arr) return null;
-  if (arr.some(x => x === "Todos" || x === "Todas" || x === "")) return null;
-  if (arr.length === 0) return [-1];
-  return arr.map(x => parseInt(x));
+  const array = Array.isArray(arr) ? arr : [arr];
+  if (array.some(x => x === "Todos" || x === "Todas" || x === "")) return null;
+  if (array.length === 0) return [-1];
+  return array.map(x => parseInt(x));
 };
 
-const mapTextFilter = (arr?: string[]) => {
+const mapTextFilter = (arr?: string[] | string) => {
   if (!arr) return null;
-  if (arr.some(x => x === "Todos" || x === "Todas" || x === "")) return null;
-  if (arr.length === 0) return ["__NONE__"];
-  return arr;
+  const array = Array.isArray(arr) ? arr : [arr];
+  if (array.some(x => x === "Todos" || x === "Todas" || x === "")) return null;
+  if (array.length === 0) return ["__NONE__"];
+  return array;
 };
 
-export async function getDashboardStats(filters: { year?: string[]; month?: string[]; day?: string[]; region?: string[]; agencia?: string[] } = {}) {
+export async function getDashboardStats(filters: { year?: string | string[]; month?: string | string[]; day?: string | string[]; region?: string | string[]; agencia?: string | string[] } = {}) {
   const p_years = mapIntFilter(filters.year);
   const p_months = mapIntFilter(filters.month);
   const p_days = mapIntFilter(filters.day);
@@ -91,7 +93,7 @@ export async function getFiltrosBasicos() {
     agencias: data.agencias || []
   };
 }
-export async function getMonthlyPivot(filters: { year?: string[]; region?: string[]; agencia?: string[] } = {}) {
+export async function getMonthlyPivot(filters: { year?: string | string[]; region?: string | string[]; agencia?: string | string[] } = {}) {
   const p_years = mapIntFilter(filters.year);
   const p_regions = mapTextFilter(filters.region);
   const p_agencias = mapTextFilter(filters.agencia);

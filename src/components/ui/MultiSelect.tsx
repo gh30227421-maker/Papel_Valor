@@ -43,8 +43,8 @@ export default function MultiSelect({ values = [], onChange, options, placeholde
   const specificOptions = options.filter(o => !isAllOption(o.value));
   const allSpecificValues = specificOptions.map(o => o.value);
 
-  // Consideramos "Todos" seleccionado si el array incluye la palabra clave, o si TODOS los específicos están seleccionados, o si está vacío (estado inicial)
-  const isAllSelected = values.length === 0 || values.some(isAllOption) || (allSpecificValues.length > 0 && allSpecificValues.every(opt => values.includes(opt)));
+  // Consideramos "Todos" seleccionado si el array incluye la palabra clave, o si TODOS los específicos están seleccionados
+  const isAllSelected = values.some(isAllOption) || (allSpecificValues.length > 0 && allSpecificValues.every(opt => values.includes(opt)));
 
   const handleToggle = (value: string) => {
     if (isAllOption(value)) {

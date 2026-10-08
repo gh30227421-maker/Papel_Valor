@@ -6,18 +6,33 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export async function getDashboardStats(filters: { year?: string; month?: string; region?: string; agencia?: string } = {}) {
-  // Convertimos los parámetros para el RPC. Null explícito para parámetros vacíos.
-  const p_year = filters.year && filters.year !== "Todos" ? parseInt(filters.year) : null;
-  const p_month = filters.month && filters.month !== "Todos" ? parseInt(filters.month) : null;
-  const p_region = filters.region && filters.region !== "Todas" ? filters.region : null;
-  const p_agencia = filters.agencia ? filters.agencia : null;
+const mapIntFilter = (arr?: string[]) => {
+  if (!arr) return null;
+  if (arr.some(x => x === "Todos" || x === "Todas" || x === "")) return null;
+  if (arr.length === 0) return [-1];
+  return arr.map(x => parseInt(x));
+};
 
-  const { data, error } = await supabase.rpc("fn_dashboard_stats_v6", {
-    p_year,
-    p_month,
-    p_region,
-    p_agencia
+const mapTextFilter = (arr?: string[]) => {
+  if (!arr) return null;
+  if (arr.some(x => x === "Todos" || x === "Todas" || x === "")) return null;
+  if (arr.length === 0) return ["__NONE__"];
+  return arr;
+};
+
+export async function getDashboardStats(filters: { year?: string[]; month?: string[]; day?: string[]; region?: string[]; agencia?: string[] } = {}) {
+  const p_years = mapIntFilter(filters.year);
+  const p_months = mapIntFilter(filters.month);
+  const p_days = mapIntFilter(filters.day);
+  const p_regions = mapTextFilter(filters.region);
+  const p_agencias = mapTextFilter(filters.agencia);
+
+  const { data, error } = await supabase.rpc("fn_dashboard_stats_v7", {
+    p_years,
+    p_months,
+    p_days,
+    p_regions,
+    p_agencias
   });
 
   if (error) {
@@ -76,15 +91,15 @@ export async function getFiltrosBasicos() {
     agencias: data.agencias || []
   };
 }
-export async function getMonthlyPivot(filters: { year?: string; region?: string; agencia?: string } = {}) {
-  const p_year = filters.year && filters.year !== "Todos" ? parseInt(filters.year) : null;
-  const p_region = filters.region && filters.region !== "Todas" ? filters.region : null;
-  const p_agencia = filters.agencia ? filters.agencia : null;
+export async function getMonthlyPivot(filters: { year?: string[]; region?: string[]; agencia?: string[] } = {}) {
+  const p_years = mapIntFilter(filters.year);
+  const p_regions = mapTextFilter(filters.region);
+  const p_agencias = mapTextFilter(filters.agencia);
 
-  const { data, error } = await supabase.rpc("fn_dashboard_monthly_pivot", {
-    p_year,
-    p_region,
-    p_agencia
+  const { data, error } = await supabase.rpc("fn_dashboard_monthly_pivot_v7", {
+    p_years,
+    p_regions,
+    p_agencias
   });
 
   if (error) {

@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import DispatchForm from "@/components/DispatchForm";
+import DistributionPlanner from "@/components/DistributionPlanner";
 import HistoricalTable from "@/components/HistoricalTable";
 import TrackerSearch from "@/components/TrackerSearch";
 import ReportGenerator from "@/components/ReportGenerator";
 import { supabase } from "@/lib/supabase";
 
 export default function DistribucionModule() {
-  const [activeTab, setActiveTab] = useState<"registro" | "historico" | "rastreo" | "reporte">("registro");
+  const [activeTab, setActiveTab] = useState<"registro" | "calculo" | "historico" | "rastreo" | "reporte">("registro");
   const [metrics, setMetrics] = useState({ volumenMesActual: 0, volumenMesAnterior: 0 });
 
   useEffect(() => {
@@ -18,7 +19,7 @@ export default function DistribucionModule() {
     }
   }, []);
 
-  const changeTab = (tab: "registro" | "historico" | "rastreo" | "reporte") => {
+  const changeTab = (tab: "registro" | "calculo" | "historico" | "rastreo" | "reporte") => {
     setActiveTab(tab);
     localStorage.setItem('distribucion_tab', tab);
   };
@@ -41,17 +42,17 @@ export default function DistribucionModule() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 flex flex-col font-sans">
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full animate-in fade-in duration-500">
+      {/* Main Content Ampliado Horizontalmente */}
+      <main className="flex-1 max-w-[1780px] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full animate-in fade-in duration-500">
         
         {/* Top Panel: Metrics & Tabs */}
         <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
           
           {/* Tabs */}
-          <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex flex-wrap sm:flex-nowrap gap-1 bg-white p-1.5 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
             <button
               onClick={() => changeTab("registro")}
-              className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === "registro" 
                   ? "bg-[#00205B] text-white shadow-md" 
                   : "text-gray-500 hover:text-[#00205B] hover:bg-gray-50"
@@ -61,8 +62,19 @@ export default function DistribucionModule() {
               Despacho
             </button>
             <button
+              onClick={() => changeTab("calculo")}
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === "calculo" 
+                  ? "bg-[#00205B] text-white shadow-md" 
+                  : "text-gray-500 hover:text-[#00205B] hover:bg-gray-50"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+              Planificador de Envíos
+            </button>
+            <button
               onClick={() => changeTab("historico")}
-              className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === "historico" 
                   ? "bg-[#00205B] text-white shadow-md" 
                   : "text-gray-500 hover:text-[#00205B] hover:bg-gray-50"
@@ -73,7 +85,7 @@ export default function DistribucionModule() {
             </button>
             <button
               onClick={() => changeTab("rastreo")}
-              className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === "rastreo" 
                   ? "bg-[#00205B] text-white shadow-md" 
                   : "text-gray-500 hover:text-[#00205B] hover:bg-gray-50"
@@ -84,7 +96,7 @@ export default function DistribucionModule() {
             </button>
             <button
               onClick={() => changeTab("reporte")}
-              className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === "reporte" 
                   ? "bg-[#00205B] text-white shadow-md" 
                   : "text-gray-500 hover:text-[#00205B] hover:bg-gray-50"
@@ -117,6 +129,7 @@ export default function DistribucionModule() {
         {/* Dynamic Content */}
         <div className="transition-all">
           {activeTab === "registro" && <DispatchForm onSuccess={() => changeTab("historico")} />}
+          {activeTab === "calculo" && <DistributionPlanner />}
           {activeTab === "historico" && <HistoricalTable />}
           {activeTab === "rastreo" && <TrackerSearch />}
           {activeTab === "reporte" && <ReportGenerator />}

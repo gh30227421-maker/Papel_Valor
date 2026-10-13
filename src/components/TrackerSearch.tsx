@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatDisplayDate } from "@/lib/dateUtils";
 
 type SearchResult = {
   id: string;
@@ -215,7 +216,7 @@ export default function TrackerSearch() {
                 {result.source === 'stock' ? (
                   <p className="text-sm text-gray-500">En inventario físico al {new Date(result.updated_at).toLocaleString('es-VE')}</p>
                 ) : (
-                  <p className="text-sm text-gray-500">Pertenece al lote despachado el {new Date(result.fecha_despacho).toLocaleDateString('es-VE')}</p>
+                  <p className="text-sm text-gray-500">Pertenece al lote despachado el {formatDisplayDate(result.fecha_despacho)}</p>
                 )}
               </div>
             </div>

@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { getStockStats } from "@/actions/dashboard";
 import LoadingOverlay from "./LoadingOverlay";
+import { getLocalTodayDate } from "@/lib/dateUtils";
 
 export default function DistributionPlanner() {
   // Parámetros de simulación
@@ -277,11 +278,41 @@ export default function DistributionPlanner() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `Distribución ${months}M`);
 
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = getLocalTodayDate();
     const fileName = `Plan_Distribucion_TDD_${months}Meses_${dateStr}.xlsx`;
 
     XLSX.writeFile(workbook, fileName);
     toast.success(`Archivo '${fileName}' exportado exitosamente.`);
+  };
+
+  // Transferir al módulo de Etiquetas Masivas
+  const handleSendToLabels = () => {
+    const dataToLabels = calculatedRows
+      .filter((r: any) => r.cantidadFinal > 0)
+      .map((r: any, idx: number) => ({
+        id: `plan-${idx}-${r.codigo_agencia}`,
+        codigo_agencia: r.codigo_agencia,
+        cantidad: r.cantidadFinal,
+        agencias: {
+          nombre: r.agencia,
+          region: r.region,
+          zona: r.zona || "—"
+        }
+      }));
+
+    if (dataToLabels.length === 0) {
+      toast.error("No hay agencias con envíos calculados para etiquetar.");
+      return;
+    }
+
+    localStorage.setItem("etiquetas_masivas_plan", JSON.stringify({
+      items: dataToLabels,
+      fecha: getLocalTodayDate()
+    }));
+    localStorage.setItem("distribucion_tab", "reporte");
+    localStorage.setItem("reporte_subtab", "masivo");
+    toast.success(`Se transfirieron ${dataToLabels.length} agencias al módulo de Etiquetas Masivas.`);
+    window.location.reload();
   };
 
   if (isLoading && !stats) {
@@ -311,11 +342,21 @@ export default function DistributionPlanner() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full lg:w-auto">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto">
+            <button
+              onClick={handleSendToLabels}
+              disabled={kpis.totalDespacho === 0}
+              className="flex-1 sm:flex-none px-5 py-2.5 bg-[#FE5000] hover:bg-[#d94400] text-white font-black text-sm rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+              Imprimir Etiquetas del Plan
+            </button>
             <button
               onClick={handleExportExcel}
               disabled={kpis.totalDespacho === 0}
-              className="w-full lg:w-auto px-6 py-2.5 bg-[#009639] hover:bg-[#007a2e] text-white font-black text-sm rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="flex-1 sm:flex-none px-6 py-2.5 bg-[#009639] hover:bg-[#007a2e] text-white font-black text-sm rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

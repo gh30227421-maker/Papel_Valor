@@ -86,7 +86,6 @@ export default function RecepcionPage() {
                   <img src="/images/tarjeta-bnc.png" alt="Tarjeta BNC" className="h-28 object-contain drop-shadow-md hover:scale-105 transition-transform duration-300" />
                 </div>
                 <h2 className="text-gray-800 text-lg font-bold">Verificar Lote Recibido</h2>
-                <p className="text-gray-500 text-sm mt-1">Ingrese los datos que aparecen en la etiqueta o correo electrónico para validar la entrega.</p>
               </div>
 
               {errorMsg && (

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import CustomSelect from "./ui/CustomSelect";
+import { getLocalTodayDate } from "@/lib/dateUtils";
 
 type AgencyData = {
   codigo: string;
@@ -14,7 +15,7 @@ type AgencyData = {
 };
 
 export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) {
-  const [dispatchDate, setDispatchDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [dispatchDate, setDispatchDate] = useState(() => getLocalTodayDate());
   const [agencyCode, setAgencyCode] = useState("");
   const [agencyData, setAgencyData] = useState<AgencyData | null>(null);
   const [agencyError, setAgencyError] = useState("");

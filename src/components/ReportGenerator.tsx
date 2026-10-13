@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import CustomSelect from "./ui/CustomSelect";
 import { toast } from "sonner";
 
 export default function ReportGenerator() {
   const [operator, setOperator] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [despachos, setDespachos] = useState<any[]>([]);
   const [availableOperators, setAvailableOperators] = useState<string[]>([]);
@@ -26,6 +27,7 @@ export default function ReportGenerator() {
         const { data: perfil } = await supabase.from("perfiles").select("nombre").eq("id", user.id).single();
         if (perfil && perfil.nombre) {
           currentUserNombre = perfil.nombre.trim();
+          setCurrentUserName(currentUserNombre);
           setOperator(currentUserNombre);
         }
       }
@@ -57,13 +59,18 @@ export default function ReportGenerator() {
   const fetchDespachos = async () => {
     setIsLoading(true);
     
-    // Primero buscamos los despachos
-    const { data: despachosData, error } = await supabase
+    // Si operator es "TODOS", traemos los despachos de ambos operadores para esa fecha
+    let query = supabase
       .from("despachos")
       .select("*")
       .eq("fecha_despacho", date)
-      .eq("elaborador", operator)
       .order("id", { ascending: true });
+
+    if (operator !== "TODOS") {
+      query = query.eq("elaborador", operator);
+    }
+
+    const { data: despachosData, error } = await query;
 
     if (error || !despachosData || despachosData.length === 0) {
       console.error("Error o sin datos:", error);
@@ -73,7 +80,6 @@ export default function ReportGenerator() {
     }
 
     // Luego buscamos los detalles de las agencias de forma manual
-    // (Porque en la base de datos actual despachos y agencias no tienen Foreign Key configurada)
     const codigos = Array.from(new Set(despachosData.map(d => d.codigo_agencia).filter(Boolean)));
     
     let agenciasMap: any = {};
@@ -163,6 +169,20 @@ export default function ReportGenerator() {
 
   const totalQuantity = despachos.reduce((acc, curr) => acc + (curr.cantidad || 0), 0);
 
+  // Resumen por operador cuando se visualiza consolidado
+  const operatorBreakdown = useMemo(() => {
+    const summary: { [key: string]: { count: number; cantidad: number } } = {};
+    despachos.forEach((d) => {
+      const op = d.elaborador?.trim() || "Sin Operador";
+      if (!summary[op]) {
+        summary[op] = { count: 0, cantidad: 0 };
+      }
+      summary[op].count += 1;
+      summary[op].cantidad += (d.cantidad || 0);
+    });
+    return summary;
+  }, [despachos]);
+
   // Solución segura para evitar que la zona horaria le reste 1 día (ej. 5/10 se vuelva 4/10)
   const formatLocalDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -202,7 +222,8 @@ export default function ReportGenerator() {
             placeholder="Seleccione un Operador..."
             options={[
               { value: "", label: "Seleccione un Operador..." },
-              ...availableOperators.map(op => ({ value: op, label: op }))
+              { value: "TODOS", label: "👥 Ambos Operadores (Consolidado)" },
+              ...availableOperators.map(op => ({ value: op, label: `👤 ${op}` }))
             ]}
           />
         </div>
@@ -242,8 +263,33 @@ export default function ReportGenerator() {
              <p className="text-sm text-gray-400 mt-1">Seleccione un operador y asegúrese de que la fecha sea correcta.</p>
           </div>
         ) : (
-          <div className="space-y-12">
+          <div className="space-y-8">
             
+            {/* RESUMEN CONSOLIDADO SI ES AMBOS OPERADORES */}
+            {operator === "TODOS" && Object.keys(operatorBreakdown).length > 0 && (
+              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#00205B] text-white flex items-center justify-center font-bold text-lg shrink-0">
+                    👥
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-[#00205B]">Consolidado General de Operadores</h5>
+                    <p className="text-[11px] text-gray-500">Total de {despachos.length} envíos registrados en el día</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2.5">
+                  {Object.entries(operatorBreakdown).map(([opName, stats]) => (
+                    <div key={opName} className="bg-white border border-blue-100 rounded-lg px-3 py-1.5 shadow-xs">
+                      <span className="text-xs font-bold text-gray-800 block">👤 {opName}</span>
+                      <span className="text-[11px] text-gray-600 font-medium">
+                        {stats.count} agencias • <strong className="text-[#009639]">{Number(stats.cantidad).toLocaleString('es-VE')}</strong> TDD
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* EMAIL PREVIEW */}
             <div>
               <h4 className="text-[#009639] font-black text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -284,6 +330,9 @@ export default function ReportGenerator() {
                         <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left" }}>Agencia</th>
                         <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left" }}>Región</th>
                         <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left" }}>Zona</th>
+                        {operator === "TODOS" && (
+                          <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left" }}>Operador</th>
+                        )}
                         <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center" }}>Cant.</th>
                         <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center" }}>Correlativo Inicial</th>
                         <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center" }}>Correlativo Final</th>
@@ -296,13 +345,16 @@ export default function ReportGenerator() {
                           <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.agencias?.nombre}</td>
                           <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.agencias?.region}</td>
                           <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.agencias?.zona}</td>
+                          {operator === "TODOS" && (
+                            <td style={{ border: "1px solid #ddd", padding: "8px", fontWeight: "bold", color: "#00205B" }}>{d.elaborador}</td>
+                          )}
                           <td style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", fontWeight: "bold" }}>{Number(d.cantidad).toLocaleString('es-VE')}</td>
                           <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace", textAlign: "center" }}>{formatCorrelativo(d.correlativo_inicial)}</td>
                           <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace", textAlign: "center" }}>{formatCorrelativo(d.correlativo_final)}</td>
                         </tr>
                       ))}
                       <tr style={{ backgroundColor: "#f9f9f9", fontWeight: "bold" }}>
-                        <td colSpan={4} style={{ border: "1px solid #ddd", padding: "8px", textAlign: "right" }}>TOTAL GENERAL:</td>
+                        <td colSpan={operator === "TODOS" ? 5 : 4} style={{ border: "1px solid #ddd", padding: "8px", textAlign: "right" }}>TOTAL GENERAL:</td>
                         <td style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", color: "#009639" }}>{Number(totalQuantity).toLocaleString('es-VE')}</td>
                         <td colSpan={2} style={{ border: "1px solid #ddd", padding: "8px" }}></td>
                       </tr>
@@ -375,7 +427,9 @@ export default function ReportGenerator() {
                           <div>
                             <h1 className="text-xl font-black text-[#00205B] tracking-tight">BANCO NACIONAL DE CRÉDITO</h1>
                             <h2 className="text-[10px] font-bold text-gray-800 mt-1 uppercase tracking-widest">V.P.E BANCA COMERCIAL / ADMINISTRACIÓN DE AGENCIAS</h2>
-                            <h3 className="text-[9px] font-bold text-gray-500 mt-0.5 uppercase tracking-widest">Inventario Papel Valor / Distribución MasterCard Debit</h3>
+                            <h3 className="text-[9px] font-bold text-gray-500 mt-0.5 uppercase tracking-widest">
+                              Inventario Papel Valor / Distribución MasterCard Debit {operator === "TODOS" ? "• Consolidado General" : ""}
+                            </h3>
                           </div>
                         </div>
                         <div className="text-right print:mr-12">
@@ -392,12 +446,15 @@ export default function ReportGenerator() {
                           <thead>
                             <tr className="bg-gray-100 border-b-2 border-gray-300">
                               <th className="w-[5%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Cód</th>
-                              <th className="w-[25%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Agencia</th>
-                              <th className="w-[15%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Región</th>
-                              <th className="w-[15%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Zona</th>
+                              <th className={`${operator === "TODOS" ? "w-[20%]" : "w-[25%]"} py-1 px-1 font-black text-gray-800 uppercase tracking-wider`}>Agencia</th>
+                              <th className={`${operator === "TODOS" ? "w-[12%]" : "w-[15%]"} py-1 px-1 font-black text-gray-800 uppercase tracking-wider`}>Región</th>
+                              <th className={`${operator === "TODOS" ? "w-[12%]" : "w-[15%]"} py-1 px-1 font-black text-gray-800 uppercase tracking-wider`}>Zona</th>
+                              {operator === "TODOS" && (
+                                <th className="w-[14%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider">Operador</th>
+                              )}
                               <th className="w-[8%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Cant.</th>
-                              <th className="w-[16%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Corr. Inicial</th>
-                              <th className="w-[16%] py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center">Corr. Final</th>
+                              <th className={`${operator === "TODOS" ? "w-[14.5%]" : "w-[16%]"} py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center`}>Corr. Inicial</th>
+                              <th className={`${operator === "TODOS" ? "w-[14.5%]" : "w-[16%]"} py-1 px-1 font-black text-gray-800 uppercase tracking-wider text-center`}>Corr. Final</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -407,6 +464,9 @@ export default function ReportGenerator() {
                                 <td className="py-1 px-1 text-gray-800 break-words">{d.agencias?.nombre}</td>
                                 <td className="py-1 px-1 text-gray-600 text-[9px] break-words">{d.agencias?.region}</td>
                                 <td className="py-1 px-1 text-gray-600 text-[9px] break-words">{d.agencias?.zona}</td>
+                                {operator === "TODOS" && (
+                                  <td className="py-1 px-1 text-gray-800 font-semibold text-[9px] break-words">{d.elaborador}</td>
+                                )}
                                 <td className="py-1 px-1 font-black text-center text-gray-900 break-words">{Number(d.cantidad).toLocaleString('es-VE')}</td>
                                 <td className="py-1 px-1 font-mono text-[9px] text-center text-gray-800 break-words">{formatCorrelativo(d.correlativo_inicial)}</td>
                                 <td className="py-1 px-1 font-mono text-[9px] text-center text-gray-800 break-words">{formatCorrelativo(d.correlativo_final)}</td>
@@ -415,7 +475,7 @@ export default function ReportGenerator() {
                             
                             {/* Subtotal de Página */}
                             <tr className="border-t-2 border-gray-400 bg-gray-50">
-                              <td colSpan={4} className="py-2 px-1 font-bold text-right text-[10px] text-gray-600">TOTAL DE ESTA PÁGINA:</td>
+                              <td colSpan={operator === "TODOS" ? 5 : 4} className="py-2 px-1 font-bold text-right text-[10px] text-gray-600">TOTAL DE ESTA PÁGINA:</td>
                               <td className="py-2 px-1 font-bold text-center text-xs text-[#00205B]">{Number(pageTotalQuantity).toLocaleString('es-VE')}</td>
                               <td colSpan={2}></td>
                             </tr>
@@ -423,7 +483,7 @@ export default function ReportGenerator() {
                             {/* Total General (Solo Última Página) */}
                             {isLastChunk && Math.ceil(despachos.length / 15) > 1 && (
                               <tr className="border-t-4 border-gray-800 bg-gray-100">
-                                <td colSpan={4} className="py-2 px-1 font-black text-right text-xs">TOTAL GENERAL (TODAS LAS PÁGINAS):</td>
+                                <td colSpan={operator === "TODOS" ? 5 : 4} className="py-2 px-1 font-black text-right text-xs">TOTAL GENERAL (TODAS LAS PÁGINAS):</td>
                                 <td className="py-2 px-1 font-black text-center text-sm text-[#009639]">{Number(totalQuantity).toLocaleString('es-VE')}</td>
                                 <td colSpan={2}></td>
                               </tr>
@@ -435,12 +495,16 @@ export default function ReportGenerator() {
                       {/* Firmas (En todas las páginas) */}
                       <div className="flex justify-around items-end mt-4 pt-4 shrink-0 print:w-full">
                         {/* Firma 1 */}
-                        <div className="w-[25%] text-center border-t-2 border-gray-800 pt-1">
-                          <p className="font-bold text-xs text-gray-900">{operator}</p>
+                        <div className="w-[28%] text-center border-t-2 border-gray-800 pt-1">
+                          <p className="font-bold text-xs text-gray-900">
+                            {operator === "TODOS" 
+                              ? (currentUserName ? `${currentUserName} (Consolidado)` : "Consolidado de Operadores") 
+                              : operator}
+                          </p>
                           <p className="font-semibold text-[10px] text-gray-500 uppercase">Elaborado Por</p>
                         </div>
                         {/* Firma 2 */}
-                        <div className="w-[25%] text-center border-t-2 border-gray-800 pt-1">
+                        <div className="w-[28%] text-center border-t-2 border-gray-800 pt-1">
                           <p className="font-bold text-xs text-gray-900 mt-4"></p>
                           <p className="font-semibold text-[10px] text-gray-500 uppercase">Recibido Por (Correspondencia)</p>
                         </div>
@@ -559,6 +623,11 @@ export default function ReportGenerator() {
                                 <p className="text-sm font-bold text-gray-800">
                                   {formatLocalDate(date)}
                                 </p>
+                                {operator === "TODOS" && d.elaborador && (
+                                  <p className="text-[10px] text-[#00205B] font-bold uppercase mt-1 truncate">
+                                    Op: {d.elaborador}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </div>

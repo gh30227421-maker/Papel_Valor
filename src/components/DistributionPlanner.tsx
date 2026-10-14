@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { getStockStats } from "@/actions/dashboard";
 import LoadingOverlay from "./LoadingOverlay";
 import { getLocalTodayDate } from "@/lib/dateUtils";
+import CustomSelect from "./ui/CustomSelect";
 
 export default function DistributionPlanner() {
   // Parámetros de simulación
@@ -584,28 +585,32 @@ export default function DistributionPlanner() {
             </div>
 
             {/* Filtro por Región */}
-            <select
+            <CustomSelect
+              theme="dark"
+              size="sm"
               value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value)}
-              className="bg-[#1A2645] border border-gray-700 text-white text-xs font-bold rounded-lg p-2.5 outline-none cursor-pointer min-w-[170px]"
-            >
-              <option value="TODAS">Todas las Regiones</option>
-              {availableRegions.map(reg => (
-                <option key={reg} value={reg}>{reg}</option>
-              ))}
-            </select>
+              onChange={setRegionFilter}
+              className="min-w-[170px]"
+              options={[
+                { value: "TODAS", label: "Todas las Regiones" },
+                ...availableRegions.map(reg => ({ value: reg, label: reg }))
+              ]}
+            />
 
             {/* Filtro por Estatus */}
-            <select
+            <CustomSelect
+              theme="dark"
+              size="sm"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-[#1A2645] border border-gray-700 text-white text-xs font-bold rounded-lg p-2.5 outline-none cursor-pointer min-w-[170px]"
-            >
-              <option value="todos">Todos los Estatus</option>
-              <option value="critico">Estatus: Crítico (&lt; 7 días)</option>
-              <option value="precaucion">Estatus: Precaución (7-15 días)</option>
-              <option value="saludable">Estatus: Saludable (&gt; 15 días)</option>
-            </select>
+              onChange={(val) => setStatusFilter(val as any)}
+              className="min-w-[170px]"
+              options={[
+                { value: "todos", label: "Todos los Estatus" },
+                { value: "critico", label: "Estatus: Crítico (< 7 días)" },
+                { value: "precaucion", label: "Estatus: Precaución (7-15 días)" },
+                { value: "saludable", label: "Estatus: Saludable (> 15 días)" },
+              ]}
+            />
 
             {/* Toggle Solo con Envío */}
             <button

@@ -197,7 +197,7 @@ export default function AgencyCombobox({
             <div className="flex items-center gap-2 truncate">
               {/* Badge de Código */}
               <span className="font-mono text-xs font-black text-[#00205B] bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded shadow-2xs shrink-0">
-                #{selectedAgency.codigo}
+                {selectedAgency.codigo}
               </span>
               {/* Nombre de Agencia */}
               <span className="font-bold text-gray-900 text-xs truncate">
@@ -364,7 +364,7 @@ export default function AgencyCombobox({
                             : "bg-gray-100 text-[#00205B] border border-gray-200"
                         }`}
                       >
-                        #{agency.codigo}
+                        {agency.codigo}
                       </span>
 
                       {/* Nombre y detalles */}

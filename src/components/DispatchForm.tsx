@@ -76,19 +76,22 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
       setIsSearchingAgency(true);
       setAgencyError("");
       
+      const noZeros = code.replace(/^0+/, "") || "0";
+      const candidates = Array.from(new Set([code, noZeros, noZeros.padStart(2, "0"), noZeros.padStart(3, "0")]));
+      
       const { data, error } = await supabase
         .from("agencias")
         .select("*")
-        .eq("codigo", code)
-        .single();
+        .in("codigo", candidates)
+        .limit(1);
 
       setIsSearchingAgency(false);
 
-      if (error || !data) {
+      if (error || !data || data.length === 0) {
         setAgencyData(null);
         if (code.length >= 1) setAgencyError("Agencia no encontrada");
       } else {
-        setAgencyData(data);
+        setAgencyData(data[0]);
         setAgencyError("");
       }
     };

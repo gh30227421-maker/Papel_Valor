@@ -106,9 +106,10 @@ export default function RecepcionPage() {
                     required
                     value={codigoAgencia}
                     onChange={(e) => setCodigoAgencia(e.target.value)}
-                    placeholder="Ej: 144"
+                    placeholder="Ej: 144 ó 020"
                     className="w-full px-4 py-3 bg-gray-50 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00205B] focus:border-transparent outline-none transition-all font-mono text-lg font-bold"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Puede ingresar con o sin cero por delante (ej: 20 ó 020).</p>
                 </div>
 
                 <div>
@@ -173,7 +174,7 @@ export default function RecepcionPage() {
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-3">
                 <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                   <span className="text-gray-500 text-sm">Agencia Destino:</span>
-                  <span className="font-bold text-gray-900 text-right">{despacho.codigo_agencia} - {despacho.agencias?.nombre}</span>
+                  <span className="font-bold text-gray-900 text-right">{despacho.codigo_agencia} - {despacho.agencias?.nombre || 'Agencia'}</span>
                 </div>
                 <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                   <span className="text-gray-500 text-sm">Cantidad a Recibir:</span>

@@ -756,7 +756,7 @@ export default function DashboardStats() {
                     ...row,
                     monthName: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][row.mes - 1]
                   }))} 
-                  margin={{ top: 20, right: 20, left: -10, bottom: 0 }}
+                  margin={{ top: 36, right: 25, left: -5, bottom: 0 }}
                 >
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
@@ -781,7 +781,7 @@ export default function DashboardStats() {
                   />
                   <RechartsTooltip 
                     contentStyle={{ borderRadius: '8px', border: '1px solid #f3f4f6', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', fontSize: '11px', fontWeight: 'bold', padding: '12px' }}
-                    formatter={(value: number) => [new Intl.NumberFormat('es-VE').format(value), "Total General"]}
+                    formatter={(value: any) => [new Intl.NumberFormat('es-VE').format(value), "Total General"]}
                     labelStyle={{ color: '#0B132B', marginBottom: '4px' }}
                   />
                   <Area 
@@ -790,8 +790,66 @@ export default function DashboardStats() {
                     stroke="#00205B" 
                     strokeWidth={3} 
                     fill="url(#colorTotal)" 
-                    activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2, fill: '#00205B' }} 
-                  />
+                    dot={(dotProps: any) => {
+                      const val = Number(dotProps.payload?.total ?? (Array.isArray(dotProps.value) ? dotProps.value[1] : dotProps.value)) || 0;
+                      if (val <= 0) return null;
+                      return (
+                        <circle
+                          key={dotProps.key || `${dotProps.cx}-${dotProps.cy}`}
+                          cx={dotProps.cx}
+                          cy={dotProps.cy}
+                          r={4}
+                          stroke="#00205B"
+                          strokeWidth={2}
+                          fill="#FFFFFF"
+                        />
+                      );
+                    }}
+                    activeDot={{ r: 6, stroke: '#FE5000', strokeWidth: 2, fill: '#00205B' }} 
+                  >
+                    <LabelList 
+                      dataKey="total" 
+                      content={(labelProps: any) => {
+                        const { x, y, value } = labelProps;
+                        if (!value || Number(value) === 0) return null;
+
+                        const formatted = Number(value).toLocaleString("es-VE");
+                        const maxVal = Math.max(...pivotData.map((r: any) => r.total || 0), 1);
+                        const isPeak = Number(value) >= maxVal;
+                        const badgeWidth = formatted.length * 6.2 + 12;
+                        const badgeHeight = 17;
+                        const rx = 4;
+
+                        return (
+                          <g transform={`translate(${x}, ${y - 14})`} style={{ pointerEvents: 'none' }}>
+                            {/* Fondo blanco 100% opaco que tapa completamente la línea azul */}
+                            <rect
+                              x={-badgeWidth / 2}
+                              y={-badgeHeight / 2}
+                              width={badgeWidth}
+                              height={badgeHeight}
+                              rx={rx}
+                              fill="#FFFFFF"
+                              stroke={isPeak ? "#FE5000" : "#D1D5DB"}
+                              strokeWidth={isPeak ? 1.5 : 1}
+                              style={{ filter: "drop-shadow(0px 1px 2px rgba(0, 32, 91, 0.16))" }}
+                            />
+                            <text
+                              x={0}
+                              y={3.5}
+                              textAnchor="middle"
+                              fill={isPeak ? "#FE5000" : "#00205B"}
+                              fontSize={9.5}
+                              fontWeight="800"
+                              fontFamily="system-ui, -apple-system, sans-serif"
+                            >
+                              {formatted}
+                            </text>
+                          </g>
+                        );
+                      }}
+                    />
+                  </Area>
                 </AreaChart>
               </ResponsiveContainer>
             </div>

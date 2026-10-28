@@ -2,9 +2,21 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import LoadingOverlay from "./LoadingOverlay";
+import { 
+  LayoutDashboard, 
+  Truck, 
+  FileSpreadsheet, 
+  UploadCloud, 
+  ShieldCheck, 
+  User, 
+  LogOut, 
+  Download, 
+  Menu, 
+  X 
+} from "lucide-react";
 
 export default function Navigation({ initialRol = 'invitado', initialNombre = '' }: { initialRol?: string, initialNombre?: string }) {
   const pathname = usePathname();
@@ -14,6 +26,8 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
   const [nombre, setNombre] = useState<string>(initialNombre);
   const [isNavigating, setIsNavigating] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -21,11 +35,8 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
-      // Update UI notify the user they can install the PWA
       setIsInstallable(true);
     };
 
@@ -35,32 +46,40 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
-    // Show the install prompt
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       setIsInstallable(false);
     }
-    // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);
   };
 
   useEffect(() => {
-    // Sincronizar si cambia desde el servidor
     setRol(initialRol);
     setNombre(initialNombre);
   }, [initialRol, initialNombre]);
 
   useEffect(() => {
-    // Apagar el loader cada vez que la ruta termina de cambiar
     setIsNavigating(false);
+    setMobileMenuOpen(false);
   }, [pathname]);
+
+  // Click outside to close user menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLinkClick = (href: string) => {
     if (pathname !== href) {
       setIsNavigating(true);
     }
+    setMobileMenuOpen(false);
   };
 
   // No mostrar la barra de navegación en páginas públicas
@@ -81,122 +100,199 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
-  const getLinkClass = (href: string) => {
-    const isActive = pathname === href;
-    return `px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center border-b-[3px] ${
-      isActive 
-        ? "bg-white/10 text-white border-[#FE5000]" 
-        : "border-transparent text-blue-100 hover:text-white hover:bg-white/5"
-    }`;
+  const isTabActive = (href: string) => {
+    if (href === '/asignaciones') {
+      return pathname === '/asignaciones' || pathname === '/';
+    }
+    return pathname?.startsWith(href);
   };
 
+  const navLinks = [
+    {
+      name: "Métricas Operativas",
+      href: "/asignaciones",
+      icon: LayoutDashboard,
+      visible: true,
+    },
+    {
+      name: "Distribución y Rastreo",
+      href: "/distribucion",
+      icon: Truck,
+      visible: rol === 'admin' || rol === 'usuario',
+    },
+    {
+      name: "Buscador Tabular",
+      href: "/reporte-tabular",
+      icon: FileSpreadsheet,
+      visible: rol === 'admin' || rol === 'usuario',
+    },
+    {
+      name: "Carga Masiva",
+      href: "/carga",
+      icon: UploadCloud,
+      visible: rol === 'admin',
+    },
+    {
+      name: "Panel Admin",
+      href: "/admin",
+      icon: ShieldCheck,
+      visible: rol === 'admin',
+    },
+  ];
+
   return (
-    <nav className="bg-[#00205B] shadow-md z-50 sticky top-0 border-b-4 border-[#FE5000]">
+    <nav className="bg-white border-b-2 border-[#FE5000] shadow-[0_2px_8px_rgba(0,32,91,0.04)] sticky top-0 z-50">
       <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
-          <div className="flex items-center">
-            
-            {/* LOGO INSTITUCIONAL PRO */}
-            <Link href="/" className="mr-8 flex items-center gap-4 group py-2">
-              <div className="bg-white p-2 rounded-lg shadow-md flex items-center justify-center group-hover:shadow-lg transition-all duration-300 shrink-0">
-                <img 
-                  src="/logo-bnc.png" 
-                  alt="Logo BNC" 
-                  className="h-9 w-auto object-contain"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
-              <div className="flex flex-col justify-center">
-                <span className="text-[9px] font-medium text-blue-200/70 uppercase tracking-wider leading-tight">V.P.E. Banca Comercial</span>
-                <span className="text-[9px] font-medium text-blue-200/70 uppercase tracking-wider leading-tight mb-1">V.P. Administración de Agencias</span>
-                <span className="text-lg font-black text-white tracking-widest leading-none drop-shadow-md">INVENTARIO PAPEL VALOR</span>
+        <div className="flex justify-between items-center h-16">
+          
+          {/* LADO IZQUIERDO: LOGO BNC + TÍTULO */}
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+            <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group py-1.5 focus:outline-none">
+              <img 
+                src="/logo-bnc.png" 
+                alt="Logo BNC" 
+                className="h-8 sm:h-9 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+              <div className="h-6 w-[1.5px] bg-slate-200" />
+              <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
+                <span className="text-base sm:text-lg font-black text-[#00205B] tracking-tight">
+                  INVENTARIO
+                </span>
+                <span className="text-base sm:text-lg font-light text-slate-400 tracking-wide">
+                  PAPEL VALOR
+                </span>
               </div>
             </Link>
 
-            {/* ENLACES DE NAVEGACIÓN */}
-            <div className="hidden md:flex space-x-2">
-              
-              {/* Visible para todos (Pasa a ser el primero) */}
-              <Link href="/asignaciones" onClick={() => handleLinkClick('/asignaciones')} className={getLinkClass('/asignaciones')}>
-                Métricas Operativas
-              </Link>
-
-              {/* Visible para Admin y Usuario (Pasa a ser el segundo) */}
-              {(rol === 'admin' || rol === 'usuario') && (
-                <Link href="/distribucion" onClick={() => handleLinkClick('/distribucion')} className={getLinkClass('/distribucion')}>
-                  Distribución y Rastreo
-                </Link>
-              )}
-              
-              {/* Visible para Admin y Usuario */}
-              {(rol === 'admin' || rol === 'usuario') && (
-                <Link href="/reporte-tabular" onClick={() => handleLinkClick('/reporte-tabular')} className={getLinkClass('/reporte-tabular')}>
-                  Buscador Tabular
-                </Link>
-              )}
-
-              {/* Visible solo para Admin */}
-              {rol === 'admin' && (
-                <Link href="/carga" onClick={() => handleLinkClick('/carga')} className={getLinkClass('/carga')}>
-                  Carga Masiva
-                </Link>
-              )}
+            {/* ENLACES DE NAVEGACIÓN DESKTOP */}
+            <div className="hidden lg:flex items-center space-x-1.5 xl:space-x-2 ml-4 xl:ml-6">
+              {navLinks.filter(item => item.visible).map((item) => {
+                const IconComponent = item.icon;
+                const active = isTabActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => handleLinkClick(item.href)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+                      active
+                        ? "bg-[#00205B] text-white shadow-sm"
+                        : "text-slate-600 hover:text-[#00205B] hover:bg-slate-100/80 font-medium"
+                    }`}
+                  >
+                    <IconComponent className={`w-3.5 h-3.5 shrink-0 ${active ? "text-white" : "text-slate-500"}`} />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            {rol === 'admin' && (
-              <Link href="/admin" onClick={() => handleLinkClick('/admin')} className={`transition-colors ${pathname === '/admin' ? 'text-[#FE5000] font-black' : 'text-white hover:text-orange-200 font-bold'} text-sm`}>
-                Panel Admin
-              </Link>
-            )}
-            
+
+          {/* LADO DERECHO: ACCIONES Y USUARIO */}
+          <div className="flex items-center gap-3">
             {/* BOTÓN INSTALAR PWA */}
             {isInstallable && (
               <button 
                 onClick={handleInstallClick}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FE5000] text-white rounded-lg text-xs font-bold hover:bg-[#e04800] transition-colors shadow-sm ml-2 border border-[#FE5000]"
-                title="Instalar como aplicación de escritorio/móvil"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#FE5000] text-white rounded-lg text-xs font-bold hover:bg-[#e04800] transition-colors shadow-xs"
+                title="Instalar como aplicación de escritorio o móvil"
               >
-                <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <Download className="w-3.5 h-3.5" />
                 <span>Instalar</span>
               </button>
             )}
 
-            {/* DROPDOWN DE USUARIO */}
-            <div className="relative ml-2">
+            {/* AVATAR CIRCULAR DE USUARIO (IDÉNTICO AL EJEMPLO) */}
+            <div className="relative" ref={userMenuRef}>
               <button 
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                onBlur={() => setTimeout(() => setShowUserMenu(false), 200)}
-                className="flex items-center gap-2 focus:outline-none"
+                className="w-9 h-9 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-700 hover:text-[#00205B] transition-colors focus:outline-none focus:ring-2 focus:ring-[#FE5000]/40 shadow-xs"
                 title="Menú de Usuario"
+                aria-label="Perfil de Usuario"
               >
-                <div className="w-10 h-10 bg-[#FE5000] rounded-full flex items-center justify-center text-sm font-bold shadow-inner text-white hover:bg-[#e04800] transition-colors border-2 border-[#00205B]">
-                  {getInitials(nombre)}
-                </div>
+                <User className="w-4 h-4 text-slate-700" />
               </button>
               
               {showUserMenu && (
-                <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-2xl py-2 border border-gray-100 animate-in fade-in slide-in-from-top-2">
-                  <div className="px-5 py-3 border-b border-gray-100">
-                    <p className="text-sm font-black text-[#00205B] truncate">{nombre || 'Usuario'}</p>
-                    <p className="text-xs font-bold text-gray-500 capitalize mt-0.5">{rol}</p>
+                <div className="absolute right-0 mt-2.5 w-60 bg-white rounded-2xl shadow-xl py-2 border border-slate-100 animate-in fade-in zoom-in-95 duration-150 z-50 text-gray-900">
+                  <div className="px-4 py-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[#00205B] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                        {getInitials(nombre)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black text-[#00205B] truncate">{nombre || 'Usuario BNC'}</p>
+                        <span className="inline-block text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full capitalize mt-0.5">
+                          {rol}
+                        </span>
+                      </div>
+                    </div>
                   </div>
+
+                  {rol === 'admin' && (
+                    <Link
+                      href="/admin"
+                      onClick={() => { setShowUserMenu(false); handleLinkClick('/admin'); }}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#00205B] transition-colors"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-slate-500" />
+                      <span>Panel de Administración</span>
+                    </Link>
+                  )}
+
                   <button 
                     onClick={handleSignOut}
-                    className="w-full text-left px-5 py-3 text-sm text-red-600 hover:bg-red-50 font-bold flex items-center gap-3 transition-colors mt-1"
+                    className="w-full text-left px-4 py-2.5 text-xs text-red-600 hover:bg-red-50 font-semibold flex items-center gap-2.5 transition-colors border-t border-slate-50 mt-1"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    Cerrar Sesión
+                    <LogOut className="w-4 h-4 text-red-500" />
+                    <span>Cerrar Sesión</span>
                   </button>
                 </div>
               )}
             </div>
 
+            {/* BOTÓN HAMBURGUESA MÓVIL */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 rounded-lg text-slate-600 hover:text-[#00205B] hover:bg-slate-100 transition-colors"
+              title="Abrir menú de navegación"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
+
         </div>
+
+        {/* MENÚ DESPLEGABLE MÓVIL / TABLET */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-slate-100 py-3 space-y-1 animate-in slide-in-from-top-2 duration-150">
+            {navLinks.filter(item => item.visible).map((item) => {
+              const IconComponent = item.icon;
+              const active = isTabActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => handleLinkClick(item.href)}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                    active
+                      ? "bg-[#00205B] text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-[#00205B]"
+                  }`}
+                >
+                  <IconComponent className={`w-4 h-4 shrink-0 ${active ? "text-white" : "text-slate-500"}`} />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
+
       {/* Overlay de carga forzado al navegar */}
       {isNavigating && <LoadingOverlay />}
     </nav>

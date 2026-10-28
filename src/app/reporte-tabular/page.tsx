@@ -5,7 +5,7 @@ import AsignacionesTable from "@/components/AsignacionesTable";
 
 export default function ReporteTabularModule() {
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#F5F7FA] flex flex-col font-sans">
+    <div className="min-h-[calc(100vh-4rem)] bg-[#EEF2F6] flex flex-col font-sans">
       <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
         
         {/* Module Header */}

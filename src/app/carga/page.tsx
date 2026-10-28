@@ -159,7 +159,7 @@ export default function CargaMasiva() {
   };
 
   return (
-    <div className="bg-slate-50 min-h-[calc(100vh-64px)] w-full">
+    <div className="bg-[#EEF2F6] min-h-[calc(100vh-64px)] w-full">
       <main className="max-w-6xl mx-auto px-4 py-8 w-full animate-in fade-in">
         <div className="mb-8">
           <h1 className="text-3xl font-black text-[#00205B] tracking-tight">Importación Masiva</h1>

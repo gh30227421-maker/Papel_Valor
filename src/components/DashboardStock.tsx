@@ -2,6 +2,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import LoadingOverlay from "./LoadingOverlay";
 import { getStockStats, getDashboardStats } from "@/actions/dashboard";
+import { saveStockCustodia, getStockCustodia } from "@/actions/custodia";
+import { createClient } from "@/lib/supabase/client";
+import { PackagePlus, Check, X, ShieldAlert, RotateCw } from "lucide-react";
+import { toast } from "sonner";
 import {
   PieChart,
   Pie,
@@ -60,6 +64,35 @@ export default function DashboardStock() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRegions, setExpandedRegions] = useState<string[]>([]);
 
+  // Estados para modal de stock en custodia
+  const [showCustodiaModal, setShowCustodiaModal] = useState(false);
+  const [custodiaForm, setCustodiaForm] = useState({ cantidad: 0, concepto: '', observaciones: '' });
+  const [isSavingCustodia, setIsSavingCustodia] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Verificar si el usuario autenticado es Administrador
+  useEffect(() => {
+    async function checkRole() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase
+            .from("perfiles")
+            .select("rol")
+            .eq("id", user.id)
+            .single();
+          if (data?.rol === "admin") {
+            setIsAdmin(true);
+          }
+        }
+      } catch (e) {
+        console.warn("No se pudo verificar rol de usuario:", e);
+      }
+    }
+    checkRole();
+  }, []);
+
   const toggleRegion = (regionName: string) => {
     setExpandedRegions(prev => 
       prev.includes(regionName) ? prev.filter(r => r !== regionName) : [...prev, regionName]
@@ -74,14 +107,60 @@ export default function DashboardStock() {
     return { data, asigData };
   };
 
-  const { data: swrData, isValidating } = useSWR(["dashboard-stock"], fetcher, {
-    revalidateOnFocus: false,
-    keepPreviousData: true
+  const { data: swrData, isValidating, mutate } = useSWR(["dashboard-stock"], fetcher, {
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
   });
 
   const stats = swrData?.data || null;
   const asigTotal = swrData?.asigData?.total || 0;
   const loading = !swrData && isValidating;
+
+  const handleOpenCustodiaModal = async () => {
+    if (!isAdmin) {
+      toast.error("Acceso restringido: Solo los administradores pueden ajustar el stock en custodia física.");
+      return;
+    }
+    try {
+      const current = await getStockCustodia();
+      setCustodiaForm({
+        cantidad: current?.cantidad || (stats?.stock_custodia ?? 0),
+        concepto: current?.concepto || "Custodia Bóveda Central (Lote Físico)",
+        observaciones: current?.observaciones || "",
+      });
+    } catch {
+      setCustodiaForm({
+        cantidad: stats?.stock_custodia ?? 0,
+        concepto: "Custodia Bóveda Central (Lote Físico)",
+        observaciones: "",
+      });
+    }
+    setShowCustodiaModal(true);
+  };
+
+  const handleSaveCustodia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingCustodia(true);
+    try {
+      const res = await saveStockCustodia({
+        cantidad: Number(custodiaForm.cantidad) || 0,
+        concepto: custodiaForm.concepto,
+        observaciones: custodiaForm.observaciones,
+      });
+
+      if (!res.success) {
+        toast.error(res.error || "No se pudo actualizar el stock en custodia.");
+      } else {
+        toast.success("Stock en custodia actualizado correctamente.");
+        setShowCustodiaModal(false);
+        mutate();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error al guardar el stock");
+    } finally {
+      setIsSavingCustodia(false);
+    }
+  };
 
   const proyeccionData = stats?.proyeccion || [];
 
@@ -160,6 +239,8 @@ export default function DashboardStock() {
 
   const {
     stock_boveda = 0,
+    stock_boveda_sistema = stats?.stock_boveda_sistema ?? stats?.stock_boveda ?? 0,
+    stock_custodia = stats?.stock_custodia ?? 0,
     stock_nomina = 0,
     stock_agencias = 0,
     stock_global = 0,
@@ -208,8 +289,41 @@ export default function DashboardStock() {
   };
 
   return (
-    <div className="w-full bg-[#F5F7FA] font-sans pb-12">
+    <div className="w-full bg-[#EEF2F6] font-sans pb-12">
       
+      {/* 1. BARRA SUPERIOR DE ACCIONES */}
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          {stock_custodia > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-orange-100 text-[#FE5000]">
+              <PackagePlus className="w-3.5 h-3.5" />
+              <span>+{stock_custodia.toLocaleString("es-VE")} TDD en custodia</span>
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleOpenCustodiaModal}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#00205B] hover:bg-[#00153D] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer hover:shadow-md"
+            >
+              <PackagePlus className="w-3.5 h-3.5 text-[#FE5000]" />
+              <span>Ajustar Stock en Custodia</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => mutate()}
+            disabled={isValidating}
+            className="p-2 text-slate-600 hover:text-[#00205B] bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            title="Recargar datos de stock"
+          >
+            <RotateCw className={`w-4 h-4 ${isValidating ? "animate-spin text-[#FE5000]" : ""}`} />
+          </button>
+        </div>
+      </div>
+
       {/* 2. TARJETAS KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         
@@ -224,15 +338,41 @@ export default function DashboardStock() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div>
-            <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">BÓVEDA CENTRAL</h3>
-            <p className="text-2xl font-black text-[#00205B] leading-none">{stock_boveda.toLocaleString("es-VE")}</p>
-            <p className="text-[10px] text-gray-400 mt-1">Centro de Costo 95</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">BÓVEDA CENTRAL</h3>
+                <p className="text-2xl font-black text-[#00205B] leading-none">{stock_boveda.toLocaleString("es-VE")}</p>
+              </div>
+              <div className="w-8 h-8 rounded bg-green-50 text-[#009639] flex items-center justify-center shrink-0">
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+              </div>
+            </div>
+            {stock_custodia > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px]">
+                <span className="font-bold text-[#00205B] bg-blue-50 px-1.5 py-0.5 rounded">
+                  {stock_boveda_sistema.toLocaleString("es-VE")} sistema
+                </span>
+                <span className="text-gray-300 font-bold">+</span>
+                <span className="font-bold text-[#FE5000] bg-orange-50 px-1.5 py-0.5 rounded">
+                  {stock_custodia.toLocaleString("es-VE")} custodia
+                </span>
+              </div>
+            ) : (
+              <p className="text-[10px] text-gray-400 mt-1">Centro de Costo 95</p>
+            )}
           </div>
-          <div className="w-8 h-8 rounded bg-green-50 text-[#009639] flex items-center justify-center shrink-0">
-             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleOpenCustodiaModal}
+              className="mt-2.5 text-[10px] font-bold text-[#FE5000] hover:text-[#d04200] flex items-center gap-1 pt-1.5 border-t border-gray-100 transition-colors cursor-pointer"
+            >
+              <PackagePlus className="w-3 h-3" />
+              <span>Editar custodia</span>
+            </button>
+          )}
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start hover:shadow-md transition-shadow">
@@ -821,6 +961,151 @@ export default function DashboardStock() {
       </div>
 
       </div>
+
+      {/* MODAL DE GESTIÓN DE STOCK EN CUSTODIA FÍSICA */}
+      {showCustodiaModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => !isSavingCustodia && setShowCustodiaModal(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-md w-full p-6 sm:p-7 space-y-5 animate-in zoom-in-95 duration-200 relative text-gray-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecera */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#FE5000] flex items-center justify-center shrink-0 shadow-xs">
+                  <PackagePlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#00205B] tracking-tight">
+                    Stock en Custodia Física
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Lotes en bóveda pendientes por ingresar al sistema
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowCustodiaModal(false)}
+                disabled={isSavingCustodia}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                title="Cerrar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Resumen del Impacto en Bóveda */}
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/70 space-y-2">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Consolidación en Bóveda Central (C.C. 95)
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                <div className="bg-white p-2 rounded-xl border border-slate-100">
+                  <span className="block text-[10px] text-slate-400 font-bold uppercase">En Sistema</span>
+                  <span className="text-sm font-black text-[#00205B]">
+                    {stock_boveda_sistema.toLocaleString("es-VE")}
+                  </span>
+                </div>
+                <div className="bg-white p-2 rounded-xl border border-orange-100">
+                  <span className="block text-[10px] text-orange-600 font-bold uppercase">En Custodia</span>
+                  <span className="text-sm font-black text-[#FE5000]">
+                    {(Number(custodiaForm.cantidad) || 0).toLocaleString("es-VE")}
+                  </span>
+                </div>
+                <div className="bg-blue-50/80 p-2 rounded-xl border border-blue-100">
+                  <span className="block text-[10px] text-[#00205B] font-bold uppercase">Total Bóveda</span>
+                  <span className="text-sm font-black text-[#00205B]">
+                    {(stock_boveda_sistema + (Number(custodiaForm.cantidad) || 0)).toLocaleString("es-VE")}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleSaveCustodia} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Cantidad de Tarjetas TDD en Custodia Física <span className="text-[#FE5000]">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value={custodiaForm.cantidad}
+                    onChange={(e) => setCustodiaForm({ ...custodiaForm, cantidad: Math.max(0, parseInt(e.target.value) || 0) })}
+                    placeholder="Ej: 50000"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#FE5000] focus:border-transparent outline-none font-mono text-base font-bold text-gray-900 transition-all"
+                  />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                    TDD
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Este monto se sumará de inmediato al balance de Bóveda y al Stock Global.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Concepto o Referencia de Lote
+                </label>
+                <input
+                  type="text"
+                  value={custodiaForm.concepto}
+                  onChange={(e) => setCustodiaForm({ ...custodiaForm, concepto: e.target.value })}
+                  placeholder="Ej: Custodia Bóveda Central (Lote Físico)"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#FE5000] focus:border-transparent outline-none text-xs font-medium text-gray-900 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Observaciones o Nota Operativa (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={custodiaForm.observaciones}
+                  onChange={(e) => setCustodiaForm({ ...custodiaForm, observaciones: e.target.value })}
+                  placeholder="Ej: Lote recibido de proveedor pendiente por lectura serial por serial..."
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#FE5000] focus:border-transparent outline-none text-xs font-medium text-gray-900 transition-all resize-none"
+                />
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCustodiaModal(false)}
+                  disabled={isSavingCustodia}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCustodia}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-[#FE5000] hover:bg-[#e04800] text-xs font-bold text-white transition-all shadow-md shadow-[#FE5000]/25 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {isSavingCustodia ? (
+                    <span>Guardando...</span>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Guardar Stock</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

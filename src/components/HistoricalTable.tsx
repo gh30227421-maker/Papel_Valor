@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import CustomSelect from "./ui/CustomSelect";
 import { toast } from "sonner";
-import { CheckCircle, Clock, MapPin, Search, Filter, X } from "lucide-react";
+import { CheckCircle, Clock, MapPin, Search, Filter, X, Camera, Copy, Download, FileSpreadsheet, Check } from "lucide-react";
 import { formatDisplayDate } from "@/lib/dateUtils";
+import { toBlob, toPng, toJpeg } from "html-to-image";
+import { saveAs } from "file-saver";
 
 type DespachoItem = {
   id: string;
@@ -41,6 +43,13 @@ export default function HistoricalTable() {
   const [modalFilterRegion, setModalFilterRegion] = useState<string>("");
   const [modalStatusFilter, setModalStatusFilter] = useState<"todos" | "recibido" | "transito">("todos");
   const [modalSearch, setModalSearch] = useState<string>("");
+
+  // Modal Ficha Ejecutiva para Outlook
+  const [showFichaModal, setShowFichaModal] = useState(false);
+  const [fichaMode, setFichaMode] = useState<"pendientes" | "todos">("pendientes");
+  const [isGeneratingFicha, setIsGeneratingFicha] = useState(false);
+  const fichaCardRef = useRef<HTMLDivElement>(null);
+  const fichaTableRef = useRef<HTMLTableElement>(null);
 
   const openDayModal = async (date: string) => {
     setSelectedDateModal(date);
@@ -149,6 +158,161 @@ export default function HistoricalTable() {
   const filteredModalVolumen = filteredDayDispatches.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
   const percentRecibido = filteredModalCount > 0 ? Math.round((filteredModalRecibidos / filteredModalCount) * 100) : 0;
 
+  // Elementos para la ficha de Outlook (pendientes por defecto o todos según el filtro)
+  const fichaItems = useMemo(() => {
+    return filteredDayDispatches.filter(d => {
+      if (fichaMode === "pendientes") {
+        return d.estatus_entrega !== "Recibido";
+      }
+      return true;
+    });
+  }, [filteredDayDispatches, fichaMode]);
+
+  const fichaTotalQuantity = useMemo(() => {
+    return fichaItems.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+  }, [fichaItems]);
+
+  const handleCopyFichaImage = async () => {
+    if (!fichaCardRef.current) return;
+    setIsGeneratingFicha(true);
+    try {
+      const el = fichaCardRef.current;
+      const width = el.offsetWidth || 940;
+      const height = el.offsetHeight;
+
+      const blob = await toBlob(el, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        width: width,
+        height: height,
+        canvasWidth: width * 2,
+        canvasHeight: height * 2,
+      });
+      if (blob) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        toast.success("¡Imagen copiada al portapapeles!", {
+          description: "Abre Outlook y presiona Ctrl + V para pegarla en el cuerpo del correo."
+        });
+      }
+    } catch (err: any) {
+      console.error("Error al copiar imagen:", err);
+      toast.error("No se pudo copiar la imagen directa. Prueba con 'Copiar Tabla HTML'.");
+    } finally {
+      setIsGeneratingFicha(false);
+    }
+  };
+
+  const handleCopyFichaTable = async () => {
+    if (!fichaTableRef.current) return;
+    try {
+      const html = `<div style="font-family: 'Microsoft Sans Serif', Arial, sans-serif; font-size: 11pt; color: #222222; line-height: 1.4;">${fichaTableRef.current.outerHTML}</div>`;
+      const blobHtml = new Blob([html], { type: "text/html" });
+      const blobText = new Blob([fichaTableRef.current.innerText], { type: "text/plain" });
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": blobHtml,
+          "text/plain": blobText,
+        })
+      ]);
+      toast.success("¡Tabla copiada para Outlook!", {
+        description: "Tipografía Microsoft Sans Serif lista para pegar con Ctrl + V."
+      });
+    } catch (err) {
+      toast.error("Error al copiar la tabla al portapapeles.");
+    }
+  };
+
+  const handleDownloadFicha = async (format: 'png' | 'jpg') => {
+    if (!fichaCardRef.current) return;
+    setIsGeneratingFicha(true);
+    try {
+      const el = fichaCardRef.current;
+      const width = el.offsetWidth || 940;
+      const height = el.offsetHeight;
+
+      const isPng = format === 'png';
+      const safeDate = (selectedDateModal || 'Lote').replace(/[\/\\:*?"<>|]/g, '-');
+      const safeFilter = (modalFilterRegion || modalFilterZona || (fichaMode === 'pendientes' ? 'Pendientes' : 'General'))
+        .replace(/[\/\\:*?"<>|]/g, '-')
+        .replace(/\s+/g, '_');
+      const extension = isPng ? 'png' : 'jpg';
+      const mimeType = isPng ? 'image/png' : 'image/jpeg';
+      const fileName = `Ficha_BNC_${safeDate}_${safeFilter}.${extension}`;
+
+      let blob: Blob | null = null;
+      if (isPng) {
+        blob = await toBlob(el, {
+          cacheBust: true,
+          pixelRatio: 2,
+          backgroundColor: '#ffffff',
+          width: width,
+          height: height,
+          canvasWidth: width * 2,
+          canvasHeight: height * 2,
+        });
+      } else {
+        const jpegDataUrl = await toJpeg(el, {
+          quality: 0.96,
+          pixelRatio: 2,
+          backgroundColor: '#ffffff',
+          cacheBust: true,
+          width: width,
+          height: height,
+          canvasWidth: width * 2,
+          canvasHeight: height * 2,
+        });
+        const res = await fetch(jpegDataUrl);
+        blob = await res.blob();
+      }
+
+      if (!blob) throw new Error("No se pudo generar la imagen");
+
+      const typedBlob = new Blob([blob], { type: mimeType });
+
+      // MÉTODO 1 (NATIVO WINDOWS / EDGE / CHROME): Abre el diálogo oficial "Guardar como..."
+      if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: fileName,
+            types: [
+              {
+                description: isPng ? 'Imagen PNG (*.png)' : 'Imagen JPEG (*.jpg)',
+                accept: { [mimeType]: [`.${extension}`] },
+              },
+            ],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(typedBlob);
+          await writable.close();
+          toast.success(`¡Imagen ${extension.toUpperCase()} guardada con éxito!`, {
+            description: `Guardada en su equipo como: ${fileName}`
+          });
+          return;
+        } catch (pickerErr: any) {
+          if (pickerErr.name === 'AbortError') {
+            // Cancelado por el usuario en el explorador
+            return;
+          }
+          console.warn("showSaveFilePicker no completado, usando saveAs:", pickerErr);
+        }
+      }
+
+      // MÉTODO 2: file-saver (garantiza compatibilidad en Edge y Chrome)
+      saveAs(typedBlob, fileName);
+      toast.success(`¡Imagen ${extension.toUpperCase()} descargada con éxito!`, {
+        description: `Archivo: ${fileName}`
+      });
+    } catch (err: any) {
+      console.error(`Error al descargar ${format.toUpperCase()}:`, err);
+      toast.error(`Error al generar archivo ${format.toUpperCase()}.`);
+    } finally {
+      setIsGeneratingFicha(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     const { data: result, error } = await supabase
@@ -200,7 +364,11 @@ export default function HistoricalTable() {
     fetchData();
   }, []);
 
-  const formatCorr = (c: string) => c.length === 16 ? c.replace(/(.{4})/g, '$1 ').trim() : c;
+  const formatCorr = (c: string) => {
+    if (!c) return "";
+    const digits = String(c).replace(/\D/g, "");
+    return digits.length > 0 ? digits.replace(/(.{4})/g, "$1 ").trim() : c;
+  };
 
   const filteredData = data.filter((item) => {
     const matchRegion = filterRegion ? item.agencias?.region?.toLowerCase() === filterRegion.toLowerCase() : true;
@@ -425,7 +593,7 @@ export default function HistoricalTable() {
       {/* MODAL DE RESUMEN DEL DÍA */}
       {selectedDateModal && (
         <div className="fixed inset-0 bg-[#0B132B]/80 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-5">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full sm:w-[95vw] max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
             {/* Header del Modal */}
             <div className="bg-[#00205B] p-5 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
@@ -537,40 +705,58 @@ export default function HistoricalTable() {
                 )}
               </div>
 
-              {/* Segmented Control de Estatus */}
-              <div className="flex bg-gray-200/80 p-0.5 rounded-lg text-xs font-bold shrink-0 shadow-2xs">
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                {/* Botón Ficha para Outlook */}
                 <button
-                  onClick={() => setModalStatusFilter("todos")}
-                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                    modalStatusFilter === "todos"
-                      ? "bg-white text-gray-900 shadow-xs"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
+                  type="button"
+                  onClick={() => setShowFichaModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#00205B] hover:bg-[#00153D] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer hover:shadow-md"
+                  title="Generar Ficha Ejecutiva para Outlook (Imagen / Tabla)"
                 >
-                  Todos ({totalModalAgencias})
+                  <Camera className="w-3.5 h-3.5 text-[#FE5000]" />
+                  <span>Ficha para Outlook</span>
+                  {filteredModalTransito > 0 && (
+                    <span className="bg-[#FE5000] text-white px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none">
+                      {filteredModalTransito}
+                    </span>
+                  )}
                 </button>
-                <button
-                  onClick={() => setModalStatusFilter("recibido")}
-                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                    modalStatusFilter === "recibido"
-                      ? "bg-green-600 text-white shadow-xs"
-                      : "text-gray-600 hover:text-green-700"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${modalStatusFilter === "recibido" ? "bg-white" : "bg-green-500"}`}></span>
-                  Recibidos ({totalModalRecibidos})
-                </button>
-                <button
-                  onClick={() => setModalStatusFilter("transito")}
-                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                    modalStatusFilter === "transito"
-                      ? "bg-[#FE5000] text-white shadow-xs"
-                      : "text-gray-600 hover:text-[#FE5000]"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${modalStatusFilter === "transito" ? "bg-white" : "bg-[#FE5000]"}`}></span>
-                  En Tránsito ({totalModalTransito})
-                </button>
+
+                {/* Segmented Control de Estatus */}
+                <div className="flex bg-gray-200/80 p-0.5 rounded-lg text-xs font-bold shadow-2xs">
+                  <button
+                    onClick={() => setModalStatusFilter("todos")}
+                    className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                      modalStatusFilter === "todos"
+                        ? "bg-white text-gray-900 shadow-xs"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Todos ({totalModalAgencias})
+                  </button>
+                  <button
+                    onClick={() => setModalStatusFilter("recibido")}
+                    className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                      modalStatusFilter === "recibido"
+                        ? "bg-green-600 text-white shadow-xs"
+                        : "text-gray-600 hover:text-green-700"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${modalStatusFilter === "recibido" ? "bg-white" : "bg-green-500"}`}></span>
+                    Recibidos ({totalModalRecibidos})
+                  </button>
+                  <button
+                    onClick={() => setModalStatusFilter("transito")}
+                    className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                      modalStatusFilter === "transito"
+                        ? "bg-[#FE5000] text-white shadow-xs"
+                        : "text-gray-600 hover:text-[#FE5000]"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${modalStatusFilter === "transito" ? "bg-white" : "bg-[#FE5000]"}`}></span>
+                    En Tránsito ({totalModalTransito})
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -587,8 +773,9 @@ export default function HistoricalTable() {
                     <tr>
                       <th className="py-3 px-5 font-black text-[10px] uppercase tracking-widest text-[#00205B]">Agencia</th>
                       <th className="py-3 px-4 font-black text-[10px] uppercase tracking-widest text-gray-500">Zona / Región</th>
-                      <th className="py-3 px-5 font-black text-[10px] uppercase tracking-widest text-gray-500 text-right">Cant. TDD</th>
-                      <th className="py-3 px-5 font-black text-[10px] uppercase tracking-widest text-center text-gray-500">Estado</th>
+                      <th className="py-3 px-4 font-black text-[10px] uppercase tracking-widest text-gray-500 text-right">Cant. TDD</th>
+                      <th className="py-3 px-4 font-black text-[10px] uppercase tracking-widest text-center text-gray-500">Correlativos</th>
+                      <th className="py-3 px-4 font-black text-[10px] uppercase tracking-widest text-center text-gray-500">Estado</th>
                       <th className="py-3 px-5 font-black text-[10px] uppercase tracking-widest text-gray-500">Recibido Por / Fecha</th>
                     </tr>
                   </thead>
@@ -640,12 +827,29 @@ export default function HistoricalTable() {
                           </td>
 
                           {/* Cantidad */}
-                          <td className="py-3.5 px-5 text-right font-black text-gray-900 font-mono text-sm">
+                          <td className="py-3.5 px-4 text-right font-black text-gray-900 font-mono text-sm">
                             {new Intl.NumberFormat("es-VE").format(d.cantidad)}
                           </td>
 
+                          {/* Correlativos */}
+                          <td className="py-3.5 px-4 text-center">
+                            {d.correlativo_inicial && d.correlativo_final ? (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="font-mono text-[10px] font-bold text-gray-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap shadow-2xs">
+                                  {formatCorr(d.correlativo_inicial)}
+                                </span>
+                                <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider my-0.5">al</span>
+                                <span className="font-mono text-[10px] font-bold text-gray-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap shadow-2xs">
+                                  {formatCorr(d.correlativo_final)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300 text-xs italic font-mono">—</span>
+                            )}
+                          </td>
+
                           {/* Estado con Badges Modernos */}
-                          <td className="py-3.5 px-5 text-center">
+                          <td className="py-3.5 px-4 text-center">
                             {isRecibido ? (
                               <span className="inline-flex items-center px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-green-100 text-green-800 border border-green-200 shadow-2xs">
                                 <CheckCircle className="w-3.5 h-3.5 mr-1 text-green-600" />
@@ -688,7 +892,7 @@ export default function HistoricalTable() {
 
                     {filteredDayDispatches.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-gray-500">
+                        <td colSpan={6} className="py-12 text-center text-gray-500">
                           <Filter className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                           <p className="text-sm font-bold text-gray-700">No hay agencias con los filtros seleccionados.</p>
                           <p className="text-xs text-gray-400 mt-1">Prueba seleccionando otra zona o limpiando la búsqueda.</p>
@@ -757,6 +961,249 @@ export default function HistoricalTable() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL FICHA EJECUTIVA PARA OUTLOOK */}
+      {showFichaModal && (
+        <div 
+          className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setShowFichaModal(false)}
+        >
+          <div 
+            className="bg-slate-100 rounded-3xl shadow-2xl border border-slate-300 max-w-7xl w-full sm:w-[95vw] flex flex-col max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del Modal */}
+            <div className="bg-[#00205B] p-4 sm:p-5 flex flex-wrap justify-between items-center gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white">
+                  <Camera className="w-5 h-5 text-[#FE5000]" />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-lg sm:text-xl tracking-tight leading-tight">
+                    Ficha de Seguimiento para Outlook
+                  </h3>
+                  <p className="text-blue-200 text-xs">
+                    Copia en 1 clic la imagen o tabla para pegarla con Ctrl+V en tu correo de Outlook, o descárgala en PNG/JPG
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón Cerrar */}
+              <button 
+                onClick={() => setShowFichaModal(false)}
+                className="text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Barra de Acciones y Modos */}
+            <div className="bg-white border-b border-slate-200 p-3 sm:p-4 flex flex-wrap justify-between items-center gap-3 shrink-0">
+              {/* Filtro de Modo: Pendientes vs Todos */}
+              <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs font-bold shadow-2xs">
+                <button
+                  onClick={() => setFichaMode("pendientes")}
+                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                    fichaMode === "pendientes"
+                      ? "bg-[#FE5000] text-white shadow-xs"
+                      : "text-slate-600 hover:text-[#FE5000]"
+                  }`}
+                >
+                  <span>Solo Pendientes</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${fichaMode === "pendientes" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"}`}>
+                    {filteredDayDispatches.filter(d => d.estatus_entrega !== "Recibido").length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setFichaMode("todos")}
+                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                    fichaMode === "todos"
+                      ? "bg-[#00205B] text-white shadow-xs"
+                      : "text-slate-600 hover:text-[#00205B]"
+                  }`}
+                >
+                  <span>Ver Todos</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${fichaMode === "todos" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"}`}>
+                    {filteredDayDispatches.length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Botones de Exportación / Copiado */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyFichaImage}
+                  disabled={isGeneratingFicha || fichaItems.length === 0}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#00205B] hover:bg-[#00153D] text-white rounded-xl text-xs font-black transition-all shadow-md cursor-pointer disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
+                  title="Copia una imagen de alta resolución para presionar Ctrl+V en Outlook"
+                >
+                  <Copy className="w-3.5 h-3.5 text-[#FE5000]" />
+                  <span>{isGeneratingFicha ? "Generando..." : "Copiar Imagen para Outlook"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyFichaTable}
+                  disabled={fichaItems.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-300 cursor-pointer disabled:opacity-50"
+                  title="Copia la tabla HTML con tipografía Microsoft Sans Serif"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#009639]" />
+                  <span>Copiar Tabla HTML</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadFicha('png')}
+                  disabled={isGeneratingFicha || fichaItems.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all border border-slate-300 cursor-pointer disabled:opacity-50 hover:border-slate-400"
+                  title="Descargar imagen oficial en formato PNG (.png)"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Descargar PNG</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadFicha('jpg')}
+                  disabled={isGeneratingFicha || fichaItems.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all border border-slate-300 cursor-pointer disabled:opacity-50 hover:border-slate-400"
+                  title="Descargar imagen en formato JPG (.jpg)"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#FE5000]" />
+                  <span>Descargar JPG</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Contenedor del Preview Scrolleable */}
+            <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-200/70 flex justify-center items-start">
+              {fichaItems.length === 0 ? (
+                <div className="bg-white p-12 rounded-2xl border border-slate-300 text-center max-w-md my-auto shadow-sm">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                  <h4 className="text-base font-black text-[#00205B]">¡Al Día! No hay agencias pendientes</h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Todas las agencias del filtro seleccionado ya confirmaron la recepción de sus tarjetas.
+                  </p>
+                </div>
+              ) : (
+                <div 
+                  ref={fichaCardRef}
+                  className="bg-white p-5 rounded-2xl border border-slate-300 shadow-lg w-[940px] min-w-[940px] shrink-0"
+                  style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}
+                >
+                  {/* Encabezado Operativo del Envío (Limpio y sin logos pesados) */}
+                  <div className="bg-[#00205B] text-white p-4 rounded-xl mb-3 flex justify-between items-center gap-3">
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="px-2.5 py-0.5 bg-[#FE5000] text-white text-[10px] font-black uppercase tracking-wider rounded">
+                          {fichaMode === "pendientes" ? "PENDIENTES POR CONFIRMAR" : "DISTRIBUCIÓN DE LOTE"}
+                        </span>
+                        <span className="text-white text-xs font-bold">
+                          Fecha de Envío: <strong className="text-orange-300 font-black text-sm">{formatDisplayDate(selectedDateModal)}</strong>
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-blue-200">
+                        <span className="text-blue-300 font-bold uppercase text-[9.5px]">Filtro:</span>
+                        <span className="font-bold text-white bg-white/10 px-2 py-0.5 rounded">
+                          {modalFilterRegion ? `Región: ${modalFilterRegion}` : ''}
+                          {modalFilterRegion && modalFilterZona ? ' • ' : ''}
+                          {modalFilterZona ? `Zona: ${modalFilterZona}` : ''}
+                          {!modalFilterRegion && !modalFilterZona ? 'Todas las Regiones y Zonas' : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="bg-white/10 border border-white/15 px-3 py-1.5 rounded-lg text-right">
+                        <span className="block text-[9px] font-bold text-blue-200 uppercase tracking-wider">Agencias</span>
+                        <span className="text-base font-black text-[#FE5000] leading-none">
+                          {fichaItems.length}
+                        </span>
+                      </div>
+                      <div className="bg-white/10 border border-white/15 px-3 py-1.5 rounded-lg text-right">
+                        <span className="block text-[9px] font-bold text-blue-200 uppercase tracking-wider">Total TDD</span>
+                        <span className="text-base font-black text-[#00E676] leading-none">
+                          {new Intl.NumberFormat('es-VE').format(fichaTotalQuantity)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabla de Agencias (Sin overflow interno para captura completa 100%) */}
+                  <table 
+                    ref={fichaTableRef}
+                    className="w-full text-left text-xs border-collapse rounded-xl overflow-hidden border border-slate-300"
+                    style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}
+                  >
+                    <thead>
+                      <tr className="bg-[#00205B] text-white font-bold text-[9.5px] uppercase tracking-wider" style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>
+                        <th className="py-2.5 px-3 border-r border-[#2d3a5c] text-center w-[65px]">Cód</th>
+                        <th className="py-2.5 px-3 border-r border-[#2d3a5c] w-[270px]">Agencia</th>
+                        <th className="py-2.5 px-3 border-r border-[#2d3a5c] w-[165px]">Zona / Región</th>
+                        <th className="py-2.5 px-3 border-r border-[#2d3a5c] text-center w-[90px]">Cant. TDD</th>
+                        <th className="py-2.5 px-3 border-r border-[#2d3a5c] text-center w-[260px]">Correlativos</th>
+                        <th className="py-2.5 px-3 text-center w-[90px]">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-[11px]">
+                      {fichaItems.map((d: any, idx: number) => (
+                        <tr key={d.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/70"} style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>
+                          <td className="py-2 px-3 font-mono font-bold text-[#00205B] border-r border-slate-200 text-center">
+                            {d.codigo_agencia}
+                          </td>
+                          <td className="py-2 px-3 font-bold text-gray-900 border-r border-slate-200">
+                            {d.agencias?.nombre}
+                          </td>
+                          <td className="py-2 px-3 text-gray-600 border-r border-slate-200 text-[10px]">
+                            {d.agencias?.zona || d.agencias?.region}
+                          </td>
+                          <td className="py-2 px-3 font-mono font-black text-gray-900 text-center border-r border-slate-200">
+                            {new Intl.NumberFormat('es-VE').format(d.cantidad)}
+                          </td>
+                          <td className="py-2 px-3 font-mono text-[10px] text-gray-700 text-center border-r border-slate-200 whitespace-nowrap">
+                            {formatCorr(d.correlativo_inicial)} al {formatCorr(d.correlativo_final)}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <span className={`inline-block px-2.5 py-0.5 rounded text-[9px] font-bold ${d.estatus_entrega === 'Recibido' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-[#FE5000] border border-orange-200'}`}>
+                              {d.estatus_entrega || "En Tránsito"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 font-bold text-[#00205B] text-[10.5px] border-t-2 border-slate-300" style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>
+                        <td colSpan={3} className="py-2.5 px-3 text-right uppercase tracking-wider border-r border-slate-200">
+                          TOTAL ({fichaItems.length} AGENCIAS):
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-black text-center text-[#FE5000] border-r border-slate-200 text-xs">
+                          {new Intl.NumberFormat('es-VE').format(fichaTotalQuantity)}
+                        </td>
+                        <td colSpan={2} className="py-2.5 px-3 text-[9.5px] text-gray-500 italic">
+                          {fichaMode === "pendientes" ? "Lotes en tránsito por confirmar" : "Total consolidado"}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  {/* Pie de Ficha Operativo */}
+                  <div className="mt-3 pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] text-gray-500" style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>
+                    <p className="italic font-medium">
+                      * Favor notificar a las agencias listadas confirmar la recepción en el sistema de Papel Valor.
+                    </p>
+                    <p className="font-bold text-[#00205B]">
+                      Control de Papel Valor • BNC
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

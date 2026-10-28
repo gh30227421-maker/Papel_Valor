@@ -41,7 +41,7 @@ export default function DistribucionModule() {
   }, [activeTab]);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-[calc(100vh-4rem)] bg-[#EEF2F6] flex flex-col font-sans">
       {/* Main Content Ampliado Horizontalmente */}
       <main className="flex-1 max-w-[1780px] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full animate-in fade-in duration-500">
         

@@ -7,6 +7,7 @@ import AgencyCombobox from "./ui/AgencyCombobox";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { getLocalTodayDate } from "@/lib/dateUtils";
+import { Printer } from "lucide-react";
 
 export default function ReportGenerator() {
   const [operator, setOperator] = useState("");
@@ -17,6 +18,8 @@ export default function ReportGenerator() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showLabelPrintModal, setShowLabelPrintModal] = useState(false);
   const emailRef = useRef<HTMLDivElement>(null);
+  const printDocumentRef = useRef<HTMLDivElement>(null);
+  const printLabelsRef = useRef<HTMLDivElement>(null);
 
   // Estados para Modo Coexistente: Histórico vs Etiquetas Masivas / Pre-Despacho
   const [activeMode, setActiveMode] = useState<"historico" | "masivo">("historico");
@@ -167,26 +170,145 @@ export default function ReportGenerator() {
     setIsLoading(false);
   };
 
+  const printElementIsolated = (element: HTMLElement, title: string, landscape: boolean) => {
+    const existingIframe = document.getElementById("print-iframe");
+    if (existingIframe) {
+      existingIframe.remove();
+    }
+
+    const iframe = document.createElement("iframe");
+    iframe.id = "print-iframe";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    iframe.style.visibility = "hidden";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map(el => el.outerHTML)
+      .join("\n");
+
+    const pageCss = landscape 
+      ? `@page { size: letter landscape; margin: 6mm 8mm; }`
+      : `@page { size: letter portrait; margin: 5mm; }`;
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8" />
+          <title>${title}</title>
+          ${styles}
+          <style>
+            ${pageCss}
+            *, *::before, *::after {
+              box-sizing: border-box;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              color: #000000 !important;
+              width: 100% !important;
+              height: auto !important;
+              overflow: visible !important;
+            }
+            .page-break {
+              break-after: page !important;
+              page-break-after: always !important;
+            }
+            @media print {
+              body {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${element.outerHTML}
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    const triggerPrint = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.warn("Fallback to standard print:", e);
+        window.print();
+      } finally {
+        setTimeout(() => {
+          iframe.remove();
+        }, 3000);
+      }
+    };
+
+    const images = doc.querySelectorAll("img");
+    if (images.length === 0) {
+      setTimeout(triggerPrint, 300);
+    } else {
+      let loaded = 0;
+      const total = images.length;
+      const checkAllLoaded = () => {
+        loaded++;
+        if (loaded >= total) {
+          setTimeout(triggerPrint, 200);
+        }
+      };
+      images.forEach(img => {
+        if (img.complete) {
+          checkAllLoaded();
+        } else {
+          img.onload = checkAllLoaded;
+          img.onerror = checkAllLoaded;
+        }
+      });
+      setTimeout(triggerPrint, 1000);
+    }
+  };
+
   const handlePrint = () => {
     setShowPrintModal(true);
     setTimeout(() => {
-      window.print();
-    }, 500);
+      if (printDocumentRef.current) {
+        printElementIsolated(printDocumentRef.current, "Relación de Despacho BNC", true);
+      } else {
+        window.print();
+      }
+    }, 400);
   };
 
   const handlePrintLabels = () => {
     setShowLabelPrintModal(true);
     setTimeout(() => {
-      window.print();
-    }, 500);
+      if (printLabelsRef.current) {
+        printElementIsolated(printLabelsRef.current, "Etiquetas de Despacho BNC", false);
+      } else {
+        window.print();
+      }
+    }, 400);
   };
 
   const handleCopyEmail = async () => {
     if (!emailRef.current) return;
     
     try {
-      // Método moderno para copiar HTML enriquecido
-      const htmlContent = emailRef.current.innerHTML;
+      // Método moderno para copiar HTML enriquecido garantizando tipografía Microsoft Sans Serif
+      const innerHtml = emailRef.current.innerHTML;
+      const htmlContent = `<div style="font-family: 'Microsoft Sans Serif', Arial, sans-serif; font-size: 14px; color: #222222; line-height: 1.5;">${innerHtml}</div>`;
       const blobHtml = new Blob([htmlContent], { type: "text/html" });
       const blobText = new Blob([emailRef.current.innerText], { type: "text/plain" });
       
@@ -197,7 +319,7 @@ export default function ReportGenerator() {
         })
       ]);
       toast.success("¡Correo copiado al portapapeles!", {
-        description: "Listo para pegar en Outlook o similar."
+        description: "Tipografía Microsoft Sans Serif lista para Outlook."
       });
     } catch (err) {
       // Fallback
@@ -550,51 +672,51 @@ export default function ReportGenerator() {
                       ref={emailRef} 
                       contentEditable={true}
                       suppressContentEditableWarning={true}
-                      style={{ fontFamily: '"Microsoft Sans Serif", sans-serif', fontSize: "14px", color: "#333", outline: "none" }}
+                      style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px", color: "#333", outline: "none" }}
                     >
-                      <p style={{ margin: "0 0 12px 0" }}><strong>Buen Día,</strong></p>
-                      <p style={{ margin: "0 0 12px 0" }}><strong>Estimados Regionales:</strong></p>
-                      <p style={{ margin: "0 0 12px 0" }}>Por medio de la presente, cumplo con informarles que se llevó a cabo la distribución de Tarjetas MasterCard Debit a las agencias detalladas a continuación.</p>
-                      <p style={{ margin: "0 0 12px 0" }}>Asimismo, es importante señalar que las oficinas que no hayan recibido el despacho correspondiente en la fecha actual se debe a que cuentan con un inventario adecuado de papel valor, calculado en base a sus consumos.</p>
-                      <p style={{ margin: "0 0 12px 0" }}>Aunado a eso a todas aquellas oficinas que dispongan de alguna Nomina, Jornada Especial, Operativos (Agencia Móvil), es sumamente importante que esta solicitud sea remitidas a nuestro buzón: <strong>papelvalor@bncenlinea.net</strong>, para que sean atendidas y estas no afecten el inventario mensual de la agencia.</p>
-                      <p style={{ margin: "0 0 12px 0" }}>En virtud de lo anterior, les solicitamos transmitir esta información de manera oportuna a todas las agencias pertenecientes a cada Región para asegurar que confirmen la recepción del envío, esencial para un seguimiento y control adecuado.</p>
+                      <p style={{ margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}><strong>Buen Día,</strong></p>
+                      <p style={{ margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}><strong>Estimados Regionales:</strong></p>
+                      <p style={{ margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}>Por medio de la presente, cumplo con informarles que se llevó a cabo la distribución de Tarjetas MasterCard Debit a las agencias detalladas a continuación.</p>
+                      <p style={{ margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}>Asimismo, es importante señalar que las oficinas que no hayan recibido el despacho correspondiente en la fecha actual se debe a que cuentan con un inventario adecuado de papel valor, calculado en base a sus consumos.</p>
+                      <p style={{ margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}>Aunado a eso a todas aquellas oficinas que dispongan de alguna Nomina, Jornada Especial, Operativos (Agencia Móvil), es sumamente importante que esta solicitud sea remitidas a nuestro buzón: <strong>papelvalor@bncenlinea.net</strong>, para que sean atendidas y estas no afecten el inventario mensual de la agencia.</p>
+                      <p style={{ margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}>En virtud de lo anterior, les solicitamos transmitir esta información de manera oportuna a todas las agencias pertenecientes a cada Región para asegurar que confirmen la recepción del envío, esencial para un seguimiento y control adecuado.</p>
                       
-                      <ol style={{ paddingLeft: "20px", margin: "0 0 12px 0" }}>
-                        <li style={{ marginBottom: "8px" }}><strong>Conteo y Verificación:</strong> Se debe realizar un conteo físico exhaustivo de las tarjetas recibidas.</li>
-                        <li><strong>Confirmación de Recepción:</strong> solicitamos que todas las oficinas confirmen la recepción de las tarjetas y la cantidad exacta recibida utilizando el siguiente enlace: <a href={typeof window !== 'undefined' ? `${window.location.origin}/recepcion` : '#'} style={{color: "#00205B", textDecoration: "underline"}}>{typeof window !== 'undefined' ? `${window.location.origin}/recepcion` : 'Enlace de Recepción'}</a></li>
+                      <ol style={{ paddingLeft: "20px", margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}>
+                        <li style={{ marginBottom: "8px", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}><strong>Conteo y Verificación:</strong> Se debe realizar un conteo físico exhaustivo de las tarjetas recibidas.</li>
+                        <li style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}><strong>Confirmación de Recepción:</strong> solicitamos que todas las oficinas confirmen la recepción de las tarjetas y la cantidad exacta recibida utilizando el siguiente enlace: <a href={typeof window !== 'undefined' ? `${window.location.origin}/recepcion` : '#'} style={{color: "#00205B", textDecoration: "underline", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif"}}>{typeof window !== 'undefined' ? `${window.location.origin}/recepcion` : 'Enlace de Recepción'}</a></li>
                       </ol>
                       
-                      <p style={{ margin: "0 0 12px 0" }}>Agradecemos de antemano su colaboración y la difusión urgente de estas instrucciones a los funcionarios correspondientes para garantizar el control y la seguridad del Papel Valor.</p>
+                      <p style={{ margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}>Agradecemos de antemano su colaboración y la difusión urgente de estas instrucciones a los funcionarios correspondientes para garantizar el control y la seguridad del Papel Valor.</p>
                       
-                      <p style={{ margin: "0 0 12px 0" }}>Adjunto la relación de correspondencia del día de hoy:</p>
+                      <p style={{ margin: "0 0 12px 0", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif", fontSize: "14px" }}>Adjunto la relación de correspondencia del día de hoy:</p>
                       
-                      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #ddd", fontSize: "12px", cursor: "default", fontFamily: "Arial, sans-serif" }} contentEditable={false}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #ddd", fontSize: "12px", cursor: "default", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }} contentEditable={false}>
                         <thead>
-                          <tr style={{ backgroundColor: "#00205B", color: "white" }}>
-                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left" }}>Cód</th>
-                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left" }}>Agencia</th>
-                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left" }}>Región</th>
-                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left" }}>Zona</th>
-                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center" }}>Cant.</th>
-                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center" }}>Correlativo Inicial</th>
-                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center" }}>Correlativo Final</th>
+                          <tr style={{ backgroundColor: "#00205B", color: "white", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>
+                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>Cód</th>
+                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>Agencia</th>
+                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>Región</th>
+                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "left", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>Zona</th>
+                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>Cant.</th>
+                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>Correlativo Inicial</th>
+                            <th style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>Correlativo Final</th>
                           </tr>
                         </thead>
                         <tbody>
                           {despachos.map((d) => (
-                            <tr key={d.id}>
-                              <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.codigo_agencia}</td>
-                              <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.agencias?.nombre}</td>
-                              <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.agencias?.region}</td>
-                              <td style={{ border: "1px solid #ddd", padding: "8px" }}>{d.agencias?.zona}</td>
-                              <td style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", fontWeight: "bold" }}>{Number(d.cantidad).toLocaleString('es-VE')}</td>
-                              <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace", textAlign: "center" }}>{formatCorrelativo(d.correlativo_inicial)}</td>
-                              <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace", textAlign: "center" }}>{formatCorrelativo(d.correlativo_final)}</td>
+                            <tr key={d.id} style={{ fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>
+                              <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>{d.codigo_agencia}</td>
+                              <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>{d.agencias?.nombre}</td>
+                              <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>{d.agencias?.region}</td>
+                              <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>{d.agencias?.zona}</td>
+                              <td style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", fontWeight: "bold", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>{Number(d.cantidad).toLocaleString('es-VE')}</td>
+                              <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace, 'Microsoft Sans Serif'", textAlign: "center" }}>{formatCorrelativo(d.correlativo_inicial)}</td>
+                              <td style={{ border: "1px solid #ddd", padding: "8px", fontFamily: "monospace, 'Microsoft Sans Serif'", textAlign: "center" }}>{formatCorrelativo(d.correlativo_final)}</td>
                             </tr>
                           ))}
-                          <tr style={{ backgroundColor: "#f9f9f9", fontWeight: "bold" }}>
-                            <td colSpan={4} style={{ border: "1px solid #ddd", padding: "8px", textAlign: "right" }}>TOTAL GENERAL:</td>
-                            <td style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", color: "#009639" }}>{Number(totalQuantity).toLocaleString('es-VE')}</td>
+                          <tr style={{ backgroundColor: "#f9f9f9", fontWeight: "bold", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>
+                            <td colSpan={4} style={{ border: "1px solid #ddd", padding: "8px", textAlign: "right", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>TOTAL GENERAL:</td>
+                            <td style={{ border: "1px solid #ddd", padding: "8px", textAlign: "center", color: "#009639", fontFamily: "'Microsoft Sans Serif', Arial, sans-serif" }}>{Number(totalQuantity).toLocaleString('es-VE')}</td>
                             <td colSpan={2} style={{ border: "1px solid #ddd", padding: "8px" }}></td>
                           </tr>
                         </tbody>
@@ -911,23 +1033,29 @@ export default function ReportGenerator() {
                 Cerrar Vista Previa
               </button>
               <button 
-                onClick={() => window.print()}
-                className="px-6 py-2 bg-[#00205B] text-white font-bold rounded-lg hover:bg-[#00153B] transition-colors cursor-pointer"
+                onClick={() => {
+                  if (printDocumentRef.current) {
+                    printElementIsolated(printDocumentRef.current, "Relación de Despacho BNC", true);
+                  } else {
+                    window.print();
+                  }
+                }}
+                className="px-6 py-2 bg-[#00205B] text-white font-bold rounded-lg hover:bg-[#00153B] transition-colors cursor-pointer flex items-center gap-2"
               >
-                Imprimir Documento
+                <Printer className="w-4 h-4" />
+                <span>Imprimir Documento</span>
               </button>
             </div>
 
             {/* DOCUMENTO OFICIAL BNC (PAGINADO) */}
-            <div className="print-document flex flex-col gap-8 print:gap-0">
+            <div ref={printDocumentRef} className="print-document flex flex-col gap-8 print:gap-0">
               <style dangerouslySetInnerHTML={{__html: `
                 @media print {
-                  html, body { width: 100%; margin: 0 !important; padding: 0 !important; overflow-x: hidden; }
-                  body * { visibility: hidden; }
-                  .print-document, .print-document * { visibility: visible; }
-                  .print-document { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
+                  html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; background: #fff !important; }
+                  nav, header, footer, button, .print\\:hidden { display: none !important; }
+                  .print-document { display: block !important; position: static !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; margin: 0 !important; padding: 0 !important; }
                   @page { size: letter landscape; margin: 6mm 8mm; }
-                  .page-break { break-after: page; page-break-after: always; }
+                  .page-break { break-after: page !important; page-break-after: always !important; }
                 }
               `}} />
 
@@ -1067,24 +1195,30 @@ export default function ReportGenerator() {
                   Cerrar Vista Previa
                 </button>
                 <button 
-                  onClick={() => window.print()}
-                  className="px-6 py-2 bg-[#009639] text-white font-bold rounded-lg hover:bg-[#007a2e] transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (printLabelsRef.current) {
+                      printElementIsolated(printLabelsRef.current, "Etiquetas de Despacho BNC", false);
+                    } else {
+                      window.print();
+                    }
+                  }}
+                  className="px-6 py-2 bg-[#009639] text-white font-bold rounded-lg hover:bg-[#007a2e] transition-colors cursor-pointer flex items-center gap-2"
                 >
-                  Imprimir Etiquetas
+                  <Printer className="w-4 h-4" />
+                  <span>Imprimir Etiquetas</span>
                 </button>
               </div>
             </div>
 
             {/* ETIQUETAS BNC */}
-            <div className="print-labels flex flex-col gap-8 print:gap-0">
+            <div ref={printLabelsRef} className="print-labels flex flex-col gap-8 print:gap-0">
               <style dangerouslySetInnerHTML={{__html: `
                 @media print {
-                  html, body { width: 100%; margin: 0 !important; padding: 0 !important; overflow-x: hidden; }
-                  body * { visibility: hidden; }
-                  .print-labels, .print-labels * { visibility: visible; }
-                  .print-labels { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
+                  html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; background: #fff !important; }
+                  nav, header, footer, button, .print\\:hidden { display: none !important; }
+                  .print-labels { display: block !important; position: static !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; margin: 0 !important; padding: 0 !important; }
                   @page { size: letter portrait; margin: 5mm; }
-                  .page-break { break-after: page; page-break-after: always; }
+                  .page-break { break-after: page !important; page-break-after: always !important; }
                 }
               `}} />
 

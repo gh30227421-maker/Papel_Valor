@@ -1,9 +1,10 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { getStockCustodia } from "./custodia";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const mapIntFilter = (arr?: string[] | string) => {
@@ -53,17 +54,40 @@ export async function getDashboardStats(filters: { year?: string | string[]; mon
 }
 
 export async function getStockStats(region: string = "") {
-  const { data, error } = await supabase.rpc("fn_stock_dashboard_v2", {
-    p_region: region || null
-  });
+  let rpcResult: any = null;
+  let custodiaResult: any = null;
 
-  if (error) {
+  try {
+    [rpcResult, custodiaResult] = await Promise.all([
+      supabase.rpc("fn_stock_dashboard_v2", {
+        p_region: region || null
+      }),
+      getStockCustodia()
+    ]);
+  } catch (e) {
+    console.warn("Fallo inicial en getStockStats, reintentando...", e);
+  }
+
+  // Si falló el RPC (por timeout momentáneo o bloqueo de tabla), reintentar de inmediato
+  if (!rpcResult || rpcResult.error || !rpcResult.data) {
+    console.warn("Reintentando llamada a fn_stock_dashboard_v2...");
+    rpcResult = await supabase.rpc("fn_stock_dashboard_v2", {
+      p_region: region || null
+    });
+  }
+
+  const { data, error } = rpcResult || {};
+
+  if (error || !data) {
     console.error("Error al cargar KPIs de stock:", error);
+    const custodiaQty = custodiaResult?.cantidad || 0;
     return {
-      stock_boveda: 0,
+      stock_boveda: custodiaQty,
+      stock_boveda_sistema: 0,
+      stock_custodia: custodiaQty,
       stock_nomina: 0,
       stock_agencias: 0,
-      stock_global: 0,
+      stock_global: custodiaQty,
       top_agencias: [],
       regiones: [],
       estados: [],
@@ -71,7 +95,24 @@ export async function getStockStats(region: string = "") {
     };
   }
 
-  return data;
+  // Si el RPC ya incluye stock_custodia, lo respetamos; de lo contrario sumamos la custodia manual
+  const custodiaQty = typeof data.stock_custodia === "number" ? data.stock_custodia : (custodiaResult?.cantidad || 0);
+  const bovedaSistema = typeof data.stock_boveda_sistema === "number" ? data.stock_boveda_sistema : data.stock_boveda;
+
+  // Si no hay filtro de región o es TODAS, la custodia se suma a Bóveda y al Stock Global
+  const isGlobalOrAll = !region || region.toUpperCase() === "TODAS";
+  const bovedaTotal = isGlobalOrAll ? (bovedaSistema + custodiaQty) : bovedaSistema;
+  const globalTotal = isGlobalOrAll 
+    ? ((data.stock_global || 0) + (typeof data.stock_custodia === "number" ? 0 : custodiaQty)) 
+    : data.stock_global;
+
+  return {
+    ...data,
+    stock_boveda: bovedaTotal,
+    stock_boveda_sistema: bovedaSistema,
+    stock_custodia: custodiaQty,
+    stock_global: globalTotal,
+  };
 }
 
 export async function getFiltrosBasicos() {

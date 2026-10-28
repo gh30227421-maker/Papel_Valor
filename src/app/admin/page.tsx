@@ -98,7 +98,8 @@ export default function AdminUsuarios() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-in fade-in">
+    <div className="w-full min-h-[calc(100vh-64px)] bg-[#EEF2F6] py-8">
+      <div className="max-w-6xl mx-auto px-4 animate-in fade-in">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black text-[#00205B] flex items-center">
@@ -243,6 +244,7 @@ export default function AdminUsuarios() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -5,25 +5,25 @@
   "start_url": "/login",
   "display": "standalone",
   "background_color": "#00205B",
-  "theme_color": "#FE5000",
+  "theme_color": "#00205B",
   "icons": [
     {
-      "src": "/logo-bnc.png",
-      "sizes": "500x500",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/logo-bnc.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/logo-bnc.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

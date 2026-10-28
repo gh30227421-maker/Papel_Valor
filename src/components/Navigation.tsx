@@ -161,7 +161,7 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
                 <span className="text-base sm:text-lg font-black text-[#00205B] tracking-tight">
                   INVENTARIO
                 </span>
-                <span className="text-base sm:text-lg font-light text-slate-400 tracking-wide">
+                <span className="text-base sm:text-lg font-medium text-slate-600 tracking-wide">
                   PAPEL VALOR
                 </span>
               </div>
@@ -177,13 +177,13 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
                     key={item.href}
                     href={item.href}
                     onClick={() => handleLinkClick(item.href)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+                    className={`px-3.5 py-1.5 rounded-lg text-xs transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                       active
-                        ? "bg-[#00205B] text-white shadow-sm"
-                        : "text-slate-600 hover:text-[#00205B] hover:bg-slate-100/80 font-medium"
+                        ? "bg-[#00205B] text-white font-black shadow-sm"
+                        : "text-slate-800 hover:text-[#00205B] hover:bg-slate-100 font-bold"
                     }`}
                   >
-                    <IconComponent className={`w-3.5 h-3.5 shrink-0 ${active ? "text-white" : "text-slate-500"}`} />
+                    <IconComponent className={`w-3.5 h-3.5 shrink-0 ${active ? "text-white" : "text-slate-700"}`} />
                     <span>{item.name}</span>
                   </Link>
                 );
@@ -238,7 +238,7 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
                       onClick={() => { setShowUserMenu(false); handleLinkClick('/admin'); }}
                       className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#00205B] transition-colors"
                     >
-                      <ShieldCheck className="w-4 h-4 text-slate-500" />
+                      <ShieldCheck className="w-4 h-4 text-slate-700" />
                       <span>Panel de Administración</span>
                     </Link>
                   )}
@@ -281,10 +281,10 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
                     active
                       ? "bg-[#00205B] text-white shadow-sm"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-[#00205B]"
+                      : "text-slate-800 hover:bg-slate-100 hover:text-[#00205B]"
                   }`}
                 >
-                  <IconComponent className={`w-4 h-4 shrink-0 ${active ? "text-white" : "text-slate-500"}`} />
+                  <IconComponent className={`w-4 h-4 shrink-0 ${active ? "text-white" : "text-slate-700"}`} />
                   <span>{item.name}</span>
                 </Link>
               );

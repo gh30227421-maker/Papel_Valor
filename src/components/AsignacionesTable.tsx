@@ -31,6 +31,7 @@ export default function AsignacionesTable() {
 
   // Filtros
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
@@ -38,12 +39,20 @@ export default function AsignacionesTable() {
   // Catálogos
   const [estados, setEstados] = useState<string[]>([]);
 
+  // Debounce de 400ms para evitar saturar PostgreSQL con COUNT(*) exacto en cada tecla
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // Función envuelta en useCallback para recargar la tabla
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getAsignacionesPaginated(page, pageSize, {
-        search,
+        search: debouncedSearch,
         estado: estadoFilter,
         fechaInicio,
         fechaFin,
@@ -56,7 +65,7 @@ export default function AsignacionesTable() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search, estadoFilter, fechaInicio, fechaFin]);
+  }, [page, pageSize, debouncedSearch, estadoFilter, fechaInicio, fechaFin]);
 
   useEffect(() => {
     // Cargar catálogo de estados al inicio

@@ -1,14 +1,14 @@
-const CACHE_NAME = 'papel-valor-pwa-v1';
+const CACHE_NAME = 'papel-valor-pwa-v2';
 
 // Install event
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching app shell');
       return cache.addAll([
-        '/login',
         '/logo-bnc.png',
-        '/images/tarjeta-bnc.png'
+        '/images/tarjeta-bnc.png',
+        '/images/tarjeta-bnc-real.png',
+        '/venezuela.json'
       ]);
     })
   );
@@ -22,7 +22,6 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keyList.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('[Service Worker] Removing old cache', key);
             return caches.delete(key);
           }
         })
@@ -32,17 +31,30 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event (Network first, then fallback to cache)
+// Fetch event: Solo cachear recursos estáticos e imágenes/GeoJSON para no interferir con sesiones SSR ni Server Actions
 self.addEventListener('fetch', (event) => {
-  // We only handle GET requests
   if (event.request.method !== 'GET') return;
-  // Exclude API calls or supabase calls
-  if (event.request.url.includes('/api/') || event.request.url.includes('supabase.co')) return;
+
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/data/')) return;
+
+  const isStaticAsset = /\.(?:png|jpg|jpeg|svg|gif|webp|ico|json|woff2?)$/i.test(url.pathname);
+  if (!isStaticAsset) return;
 
   event.respondWith(
-    fetch(event.request)
-      .catch(() => {
-        return caches.match(event.request);
-      })
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || fetchPromise;
+    })
   );
 });

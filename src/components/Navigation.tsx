@@ -15,8 +15,12 @@ import {
   LogOut, 
   Download, 
   Menu, 
-  X 
+  X,
+  Bell,
+  CheckCircle2
 } from "lucide-react";
+import { toast } from "sonner";
+import { checkSudebanSchedule } from "@/lib/sudebanUtils";
 
 export default function Navigation({ initialRol = 'invitado', initialNombre = '' }: { initialRol?: string, initialNombre?: string }) {
   const pathname = usePathname();
@@ -32,6 +36,94 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
+
+  // Estado de Recordatorio Automático SUDEBAN (Miércoles, 15 y Fin de Mes)
+  const [sudebanInfo, setSudebanInfo] = useState<{
+    isDueToday: boolean;
+    reason: string;
+    dateKey: string;
+    isSentToday: boolean;
+  }>({ isDueToday: false, reason: "", dateKey: "", isSentToday: false });
+  const [showSudebanPopover, setShowSudebanPopover] = useState(false);
+  const sudebanRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const syncSudebanAlert = () => {
+      const sched = checkSudebanSchedule(new Date());
+      let isSent = false;
+      try {
+        isSent = localStorage.getItem(`sudeban_sent_${sched.dateKey}`) === "true";
+      } catch {}
+      setSudebanInfo({
+        isDueToday: sched.isDueToday,
+        reason: sched.reason,
+        dateKey: sched.dateKey,
+        isSentToday: isSent,
+      });
+
+      // Si hoy corresponde enviar y aún no se ha enviado ni avisado en esta sesión, mostrar Toast y Notificación de Windows
+      if (sched.isDueToday && !isSent) {
+        const sessionNotifiedKey = `sudeban_toast_shown_${sched.dateKey}`;
+        if (!sessionStorage.getItem(sessionNotifiedKey)) {
+          sessionStorage.setItem(sessionNotifiedKey, "true");
+          setTimeout(() => {
+            toast.warning(`🔔 Recordatorio SUDEBAN: Hoy corresponde enviar el Reporte de TDD Activas (${sched.reason})`, {
+              duration: 12000,
+              action: {
+                label: "Ir a Generar",
+                onClick: () => {
+                  window.location.href = "/asignaciones?tab=stock&sudeban=open";
+                },
+              },
+            });
+
+            if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+              try {
+                new Notification("Recordatorio SUDEBAN - Papel Valor BNC", {
+                  body: `Hoy corresponde enviar el Reporte de Stock por Estado (${sched.reason}). Haz clic en el portal para descargarlo en 1 clic.`,
+                  icon: "/icon-192.png",
+                });
+              } catch {}
+            }
+          }, 1500);
+        }
+      }
+    };
+
+    syncSudebanAlert();
+    window.addEventListener("sudeban-status-changed", syncSudebanAlert);
+    return () => window.removeEventListener("sudeban-status-changed", syncSudebanAlert);
+  }, []);
+
+  const handleMarkSudebanSent = (sent: boolean) => {
+    try {
+      if (sent) {
+        localStorage.setItem(`sudeban_sent_${sudebanInfo.dateKey}`, "true");
+        toast.success("Reporte SUDEBAN marcado como enviado por el día de hoy.");
+      } else {
+        localStorage.removeItem(`sudeban_sent_${sudebanInfo.dateKey}`);
+      }
+      setSudebanInfo((prev) => ({ ...prev, isSentToday: sent }));
+      window.dispatchEvent(new Event("sudeban-status-changed"));
+    } catch {}
+  };
+
+  const handleEnableBrowserNotifications = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      toast.error("Tu navegador no soporta notificaciones de escritorio.");
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === "granted") {
+      toast.success("¡Notificaciones de escritorio activadas! Te avisaremos los Miércoles, días 15 y Fin de Mes.");
+      new Notification("Notificaciones Activas - Papel Valor BNC", {
+        body: "Recibirás avisos automáticos los Miércoles, días 15 y último de cada mes.",
+        icon: "/icon-192.png",
+      });
+    } else {
+      toast.info("Permiso de notificaciones denegado en el navegador.");
+    }
+  };
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -64,11 +156,14 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Click outside to close user menu
+  // Click outside to close user menu and sudeban popover
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
+      }
+      if (sudebanRef.current && !sudebanRef.current.contains(event.target as Node)) {
+        setShowSudebanPopover(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -193,6 +288,111 @@ export default function Navigation({ initialRol = 'invitado', initialNombre = ''
 
           {/* LADO DERECHO: ACCIONES Y USUARIO */}
           <div className="flex items-center gap-3">
+            {/* CAMPANA DE RECORDATORIO SUDEBAN (MIÉRCOLES, 15 Y FIN DE MES) */}
+            {(rol === "admin" || rol === "usuario") && (
+              <div className="relative" ref={sudebanRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowSudebanPopover(!showSudebanPopover)}
+                  className={`relative px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                    sudebanInfo.isDueToday && !sudebanInfo.isSentToday
+                      ? "bg-orange-50 border-[#FE5000] text-[#FE5000] hover:bg-orange-100"
+                      : sudebanInfo.isSentToday
+                      ? "bg-emerald-50 border-emerald-200 text-[#009639]"
+                      : "bg-slate-50 border-slate-200 text-slate-700 hover:text-[#00205B] hover:bg-slate-100"
+                  }`}
+                  title="Calendario y Generador de Reporte SUDEBAN (Miércoles, 15 y Fin de Mes)"
+                >
+                  <Bell className={`w-4 h-4 ${sudebanInfo.isDueToday && !sudebanInfo.isSentToday ? "animate-bounce text-[#FE5000]" : ""}`} />
+                  <span className="hidden md:inline">
+                    {sudebanInfo.isDueToday && !sudebanInfo.isSentToday
+                      ? "¡Hoy Toca SUDEBAN!"
+                      : sudebanInfo.isSentToday
+                      ? "SUDEBAN Enviado ✓"
+                      : "SUDEBAN"}
+                  </span>
+                  {sudebanInfo.isDueToday && !sudebanInfo.isSentToday && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#FE5000] animate-ping" />
+                  )}
+                </button>
+
+                {showSudebanPopover && (
+                  <div className="absolute right-0 mt-2.5 w-80 bg-white rounded-2xl shadow-2xl p-4 border border-slate-200 z-50 text-gray-900 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100">
+                      <div>
+                        <span className="inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-[#00205B]">
+                          Calendario Regulatorio
+                        </span>
+                        <h4 className="text-sm font-black text-[#00205B] mt-1">
+                          Reporte SUDEBAN (Stock por Estado)
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowSudebanPopover(false)}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="py-3 space-y-2.5 text-xs">
+                      <div className={`p-3 rounded-xl border ${
+                        sudebanInfo.isDueToday && !sudebanInfo.isSentToday
+                          ? "bg-orange-50/80 border-orange-200 text-orange-950"
+                          : sudebanInfo.isSentToday
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                          : "bg-slate-50 border-slate-200 text-slate-700"
+                      }`}>
+                        <p className="font-black text-xs">
+                          {sudebanInfo.isDueToday
+                            ? `🔔 Hoy es día de corte: ${sudebanInfo.reason}`
+                            : "📅 Próximos cortes programados:"}
+                        </p>
+                        <ul className="mt-1.5 space-y-1 text-[11px] text-gray-600 font-medium list-disc list-inside">
+                          <li>Todos los <strong>Miércoles</strong></li>
+                          <li>Día <strong>15 de cada mes</strong> (Quincena)</li>
+                          <li><strong>Último día</strong> de cada mes</li>
+                        </ul>
+                      </div>
+
+                      <div className="flex flex-col gap-2 pt-1">
+                        <Link
+                          href="/asignaciones?tab=stock&sudeban=open"
+                          onClick={() => setShowSudebanPopover(false)}
+                          className="w-full py-2.5 px-3 bg-[#009639] hover:bg-[#007a2e] text-white font-black text-xs rounded-xl text-center shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <FileSpreadsheet className="w-4 h-4" />
+                          <span>Abrir y Descargar Excel (1-Clic)</span>
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => handleMarkSudebanSent(!sudebanInfo.isSentToday)}
+                          className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#009639]" />
+                          <span>
+                            {sudebanInfo.isSentToday
+                              ? "Desmarcar como enviado hoy"
+                              : "Marcar como Ya Enviado hoy"}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleEnableBrowserNotifications}
+                          className="w-full py-1.5 px-3 text-[11px] font-bold text-[#00205B] hover:underline text-center cursor-pointer"
+                        >
+                          🔔 Activar avisos en Escritorio de Windows
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* BOTÓN INSTALAR PWA */}
             {isInstallable && (
               <button 

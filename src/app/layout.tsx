@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Navigation from "@/components/Navigation";
 import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
 import { Toaster } from "sonner";
 import Script from "next/script";
 import "./globals.css";
@@ -42,16 +43,26 @@ export const viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const reqHeaders = await headers();
+  const headerRol = reqHeaders.get("x-user-rol");
+  const headerNombre = reqHeaders.get("x-user-nombre");
+
   let serverRol = "invitado";
   let serverNombre = "";
-  
-  if (user) {
-    const { data } = await supabase.from('perfiles').select('rol, nombre').eq('id', user.id).single();
-    if (data) {
-      serverRol = data.rol;
-      serverNombre = data.nombre || "";
+
+  if (headerRol) {
+    // Reutilizamos el perfil ya consultado por el middleware (ahorra 2 viajes de red a Supabase por página)
+    serverRol = headerRol;
+    serverNombre = headerNombre ? decodeURIComponent(headerNombre) : "";
+  } else {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.from('perfiles').select('rol, nombre').eq('id', user.id).single();
+      if (data) {
+        serverRol = data.rol;
+        serverNombre = data.nombre || "";
+      }
     }
   }
 

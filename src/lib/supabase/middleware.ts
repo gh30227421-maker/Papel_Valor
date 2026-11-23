@@ -45,11 +45,28 @@ export async function updateSession(request: NextRequest) {
     // Si está autenticado, verificar su rol en la tabla de perfiles
     const { data: perfil } = await supabase
       .from('perfiles')
-      .select('rol')
+      .select('rol, nombre')
       .eq('id', user.id)
       .single()
 
     const rol = perfil?.rol || 'invitado'
+    const nombre = perfil?.nombre || ''
+
+    // Inyectamos rol y nombre en los headers del request hacia layout.tsx
+    // para evitar una segunda consulta idéntica a Supabase en cada carga de página
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-user-rol', rol)
+    requestHeaders.set('x-user-nombre', encodeURIComponent(nombre))
+
+    supabaseResponse = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
+    // Preservar cookies de sesión actualizadas si las hubo
+    request.cookies.getAll().forEach((cookie) => {
+      supabaseResponse.cookies.set(cookie.name, cookie.value)
+    })
 
     // Reglas de acceso según el Rol
     // ADMIN: Tiene acceso a todo.

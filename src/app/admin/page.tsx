@@ -20,11 +20,15 @@ export default function AdminUsuarios() {
   const [formData, setFormData] = useState({ nombre: '', email: '', password: '', rol: 'usuario' });
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   const supabase = createClient();
 
   useEffect(() => {
     cargarPerfiles();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setCurrentUserId(user.id);
+    });
   }, []);
 
   const cargarPerfiles = async () => {
@@ -44,6 +48,10 @@ export default function AdminUsuarios() {
   };
 
   const cambiarRol = async (id: string, nuevoRol: string) => {
+    if (id === currentUserId && nuevoRol !== "admin") {
+      toast.error("Por seguridad, no puedes quitarte el rol de Administrador a ti mismo.");
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from("perfiles")

@@ -8,3 +8,5 @@ if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { createClient as createAuthClient } from "@/lib/supabase/client";
 import CustomSelect from "./ui/CustomSelect";
 import AgencyCombobox from "./ui/AgencyCombobox";
 import { toast } from "sonner";
@@ -71,27 +72,38 @@ export default function ReportGenerator() {
       let currentUserNombre = "";
 
       // 1. Obtener el usuario actual y su perfil para autoseleccionarlo
-      const { data: { user } } = await supabase.auth.getUser();
+      const authSupabase = createAuthClient();
+      const { data: { user } } = await authSupabase.auth.getUser();
       if (user) {
-        const { data: perfil } = await supabase.from("perfiles").select("nombre").eq("id", user.id).single();
+        const { data: perfil } = await authSupabase.from("perfiles").select("nombre").eq("id", user.id).single();
         if (perfil && perfil.nombre) {
           currentUserNombre = perfil.nombre.trim();
           setOperator(currentUserNombre);
         }
       }
 
-      // 2. Cargar operadores históricos
-      const { data } = await supabase.from("despachos").select("elaborador");
-      if (data) {
-        const uniqueOps = Array.from(new Set(data.map(d => d.elaborador?.trim()).filter(Boolean))) as string[];
-        
-        // Asegurarnos de que el usuario actual esté en la lista aunque no tenga despachos previos
-        if (currentUserNombre && !uniqueOps.includes(currentUserNombre)) {
-          uniqueOps.push(currentUserNombre);
-        }
-        
-        setAvailableOperators(uniqueOps.sort());
+      // 2. Cargar operadores desde perfiles e histórico reciente (evita descargar toda la tabla despachos sin límite)
+      const [{ data: perfilesOps }, { data: despachosOps }] = await Promise.all([
+        authSupabase.from("perfiles").select("nombre").in("rol", ["admin", "usuario"]),
+        supabase.from("despachos").select("elaborador").order("fecha_despacho", { ascending: false }).limit(500)
+      ]);
+
+      const opsSet = new Set<string>();
+      if (perfilesOps) {
+        perfilesOps.forEach((p: any) => {
+          if (p.nombre?.trim()) opsSet.add(p.nombre.trim());
+        });
       }
+      if (despachosOps) {
+        despachosOps.forEach((d: any) => {
+          if (d.elaborador?.trim()) opsSet.add(d.elaborador.trim());
+        });
+      }
+      if (currentUserNombre) {
+        opsSet.add(currentUserNombre);
+      }
+
+      setAvailableOperators(Array.from(opsSet).sort());
     };
     fetchOperators();
   }, []);
@@ -1286,19 +1298,39 @@ export default function ReportGenerator() {
                               </div>
                             </div>
                             
-                            {/* COL 3: Cantidad y Fecha */}
-                            <div className="w-[27%] flex flex-col justify-center gap-2.5 pl-3 border-l-2 border-gray-200 h-full">
-                              <div className="bg-blue-50/50 p-2.5 border border-blue-100 rounded-lg">
-                                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Cantidad Enviada</p>
-                                <p className="text-xl font-black text-[#009639] leading-tight">
-                                  {Number(d.cantidad).toLocaleString('es-VE')} <span className="text-[10px] text-gray-600 font-bold">UND</span>
+                            {/* COL 3: Cantidad, Fecha y QR de Recepción */}
+                            <div className="w-[27%] flex flex-col justify-center gap-2 pl-3 border-l-2 border-gray-200 h-full">
+                              <div className="bg-blue-50/50 p-2 border border-blue-100 rounded-lg">
+                                <p className="text-[8.5px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Cantidad Enviada</p>
+                                <p className="text-lg font-black text-[#009639] leading-tight">
+                                  {Number(d.cantidad).toLocaleString('es-VE')} <span className="text-[9.5px] text-gray-600 font-bold">UND</span>
                                 </p>
                               </div>
-                              <div className="bg-gray-50 p-2 border border-gray-100 rounded-lg">
-                                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Fecha de Envío</p>
-                                <p className="text-xs font-bold text-gray-800">
-                                  {formatLocalDate(dateToPrint)}
-                                </p>
+                              <div className="flex items-center justify-between gap-2 bg-gray-50 p-1.5 border border-gray-200 rounded-lg">
+                                <div className="min-w-0">
+                                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Fecha Envío</p>
+                                  <p className="text-[11px] font-black text-gray-800 leading-tight mt-0.5">
+                                    {formatLocalDate(dateToPrint)}
+                                  </p>
+                                  <p className="text-[7px] font-bold text-[#00205B] uppercase tracking-tight mt-1 leading-tight">
+                                    📱 Escanear QR para confirmar recepción
+                                  </p>
+                                </div>
+                                {(() => {
+                                  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                                  const qrTarget = `${origin}/recepcion?agencia=${encodeURIComponent(d.codigo_agencia || '')}${d.correlativo_inicial ? `&ini=${encodeURIComponent(String(d.correlativo_inicial).replace(/\D/g, ''))}` : ''}${d.correlativo_final ? `&fin=${encodeURIComponent(String(d.correlativo_final).replace(/\D/g, ''))}` : ''}`;
+                                  const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=2&data=${encodeURIComponent(qrTarget)}`;
+                                  return (
+                                    <img
+                                      src={qrImgUrl}
+                                      alt="QR Recepción"
+                                      className="w-14 h-14 object-contain bg-white p-0.5 rounded border border-gray-300 shrink-0"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>

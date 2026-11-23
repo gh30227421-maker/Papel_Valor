@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { createClient as createAuthClient } from "@/lib/supabase/client";
 import CustomSelect from "./ui/CustomSelect";
 import { toast } from "sonner";
 import { CheckCircle, Clock, MapPin, Search, Filter, X, Camera, Copy, Download, FileSpreadsheet, Check } from "lucide-react";
@@ -34,6 +35,144 @@ export default function HistoricalTable() {
   const [filterAgency, setFilterAgency] = useState("");
   const [filterDateStart, setFilterDateStart] = useState("");
   const [filterDateEnd, setFilterDateEnd] = useState("");
+  const [filterOnlyDelayed, setFilterOnlyDelayed] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Calcula los días calendario transcurridos desde la fecha de despacho
+  const getDaysElapsed = (fechaDespacho: string): number => {
+    if (!fechaDespacho) return 0;
+    const clean = String(fechaDespacho).split("T")[0];
+    const parts = clean.split("-");
+    if (parts.length !== 3) return 0;
+    const dispDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffMs = today.getTime() - dispDate.getTime();
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  };
+
+  const SLA_DELAY_DAYS = 5;
+
+  const delayedDispatches = useMemo(() => {
+    return data
+      .filter((item) => item.estatus_entrega !== "Recibido" && getDaysElapsed(item.fecha_despacho) >= SLA_DELAY_DAYS)
+      .sort((a, b) => getDaysElapsed(b.fecha_despacho) - getDaysElapsed(a.fecha_despacho));
+  }, [data]);
+
+  const delayedCount = delayedDispatches.length;
+
+  const handleCopyDelayedClaimEmail = async () => {
+    const targetList = filterOnlyDelayed ? filteredData : delayedDispatches;
+    if (targetList.length === 0) {
+      toast.info("No hay valijas demoradas para reclamar en este momento.");
+      return;
+    }
+
+    const totalDelayedTDD = targetList.reduce((acc, d) => acc + (Number(d.cantidad) || 0), 0);
+    const originUrl = typeof window !== "undefined" ? `${window.location.origin}/recepcion` : "/recepcion";
+
+    const rowsHtml = targetList
+      .map(
+        (d) => `
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 7px 10px; font-weight: bold; color: #00205B;">${d.codigo_agencia}</td>
+          <td style="border: 1px solid #ddd; padding: 7px 10px; font-weight: bold;">${d.agencias?.nombre || "Agencia"}</td>
+          <td style="border: 1px solid #ddd; padding: 7px 10px;">${d.agencias?.region || "—"}</td>
+          <td style="border: 1px solid #ddd; padding: 7px 10px; text-align: center;">${formatDisplayDate(d.fecha_despacho)}</td>
+          <td style="border: 1px solid #ddd; padding: 7px 10px; text-align: center; color: #DC2626; font-weight: bold;">+${getDaysElapsed(d.fecha_despacho)} días</td>
+          <td style="border: 1px solid #ddd; padding: 7px 10px; text-align: center; font-weight: bold;">${Number(d.cantidad).toLocaleString("es-VE")}</td>
+          <td style="border: 1px solid #ddd; padding: 7px 10px; font-family: monospace; text-align: center; font-size: 11px;">${formatCorr(d.correlativo_inicial)} al ${formatCorr(d.correlativo_final)}</td>
+        </tr>`
+      )
+      .join("");
+
+    const html = `
+      <div style="font-family: 'Microsoft Sans Serif', Arial, sans-serif; font-size: 14px; color: #222222; line-height: 1.5;">
+        <p style="margin: 0 0 12px 0;"><strong>Buen Día,</strong></p>
+        <p style="margin: 0 0 12px 0;"><strong>Estimados Gerentes Regionales y de Agencias:</strong></p>
+        <p style="margin: 0 0 12px 0;">Por medio de la presente, hacemos un <strong>recordatorio urgente de confirmación de recepción de Papel Valor (Tarjetas MasterCard Debit)</strong>. A la fecha, los lotes detallados a continuación registran <strong>más de ${SLA_DELAY_DAYS} días en estatus "En Tránsito"</strong> sin que la oficina destino haya registrado su recepción en el sistema central:</p>
+        <p style="margin: 0 0 14px 0;">Solicitamos de su valioso apoyo para instruir a las agencias listadas a realizar de inmediato el conteo físico y confirmar la recepción ingresando al portal oficial: <a href="${originUrl}" style="color: #00205B; font-weight: bold; text-decoration: underline;">${originUrl}</a></p>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; font-size: 12px; font-family: 'Microsoft Sans Serif', Arial, sans-serif;">
+          <thead>
+            <tr style="background-color: #00205B; color: #ffffff;">
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Cód</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Agencia</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Región</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Fecha Despacho</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Demora</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Cant. TDD</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Rango Correlativo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+            <tr style="background-color: #f3f4f6; font-weight: bold;">
+              <td colspan="5" style="border: 1px solid #ddd; padding: 8px; text-align: right;">TOTAL PENDIENTE POR CONFIRMAR (${targetList.length} LOTES):</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center; color: #DC2626;">${totalDelayedTDD.toLocaleString("es-VE")}</td>
+              <td style="border: 1px solid #ddd; padding: 8px;"></td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin: 14px 0 0 0; font-size: 12px; color: #555555;">Agradecemos su atención prioritaria para mantener al día el control y custodia nacional del Papel Valor.</p>
+      </div>
+    `;
+
+    const plainText = `RECORDATORIO URGENTE DE CONFIRMACIÓN DE RECEPCIÓN - PAPEL VALOR BNC\n\nAgencias con más de ${SLA_DELAY_DAYS} días sin confirmar recepción (${targetList.length} lotes / ${totalDelayedTDD.toLocaleString("es-VE")} TDD):\n` +
+      targetList.map((d) => `- Agencia ${d.codigo_agencia} (${d.agencias?.nombre || ""}) | Despacho: ${formatDisplayDate(d.fecha_despacho)} (+${getDaysElapsed(d.fecha_despacho)}d) | Cant: ${d.cantidad} TDD`).join("\n");
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plainText], { type: "text/plain" }),
+        }),
+      ]);
+      toast.success("¡Correo de Reclamo copiado para Outlook!", {
+        description: `Incluye las ${targetList.length} valijas demoradas con formato Microsoft Sans Serif listo para pegar (Ctrl + V).`,
+      });
+    } catch {
+      await navigator.clipboard.writeText(plainText);
+      toast.success("¡Listado de reclamo copiado al portapapeles!");
+    }
+  };
+
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const authSupabase = createAuthClient();
+        const { data: { user } } = await authSupabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await authSupabase
+            .from("perfiles")
+            .select("rol")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (profile?.rol === "admin") {
+            setIsAdmin(true);
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    };
+    checkUserRole();
+  }, []);
+
+  // Lista dinámica de regiones reales extraídas de los despachos cargados + catálogo estándar BNC
+  const availableRegionOptions = useMemo(() => {
+    const set = new Set<string>([
+      "CAPITAL",
+      "ORIENTE",
+      "CENTRO OCCIDENTE",
+      "OCCIDENTE - ANDES",
+      "ARAGUA - LOS LLANOS"
+    ]);
+    data.forEach((item) => {
+      const reg = item.agencias?.region?.trim();
+      if (reg) set.add(reg.toUpperCase());
+    });
+    return Array.from(set).sort();
+  }, [data]);
 
   // Modal de Detalle del Día
   const [selectedDateModal, setSelectedDateModal] = useState<string | null>(null);
@@ -347,6 +486,10 @@ export default function HistoricalTable() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!isAdmin) {
+      toast.error("Permisos insuficientes: Solo los administradores pueden eliminar despachos históricos.");
+      return;
+    }
     if (!confirm("¿Estás seguro de que deseas eliminar este despacho? Esta acción no se puede deshacer.")) return;
     
     setLoading(true);
@@ -384,6 +527,11 @@ export default function HistoricalTable() {
       matchDateEnd = item.fecha_despacho <= filterDateEnd;
     }
 
+    if (filterOnlyDelayed) {
+      const isDelayed = item.estatus_entrega !== "Recibido" && getDaysElapsed(item.fecha_despacho) >= SLA_DELAY_DAYS;
+      if (!isDelayed) return false;
+    }
+
     return matchRegion && matchEstado && matchAgency && matchDateStart && matchDateEnd;
   });
 
@@ -396,8 +544,36 @@ export default function HistoricalTable() {
           <p className="text-sm text-gray-500 mt-1">Consulta y trazabilidad en tiempo real de lotes asignados</p>
         </div>
         
-        <div className="flex gap-4">
-          <button onClick={fetchData} className="p-2 text-gray-400 hover:text-[#00205B] hover:bg-gray-50 rounded-md transition-colors" title="Actualizar datos">
+        <div className="flex flex-wrap items-center gap-3">
+          {delayedCount > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setFilterOnlyDelayed(!filterOnlyDelayed)}
+                className={`px-3.5 py-2 rounded-lg flex items-center gap-2 text-xs font-black transition-all cursor-pointer shadow-xs border ${
+                  filterOnlyDelayed
+                    ? "bg-red-600 text-white border-red-700 ring-2 ring-red-500/30"
+                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                }`}
+                title="Filtrar envíos en tránsito con más de 5 días sin confirmación de recepción"
+              >
+                <span className={`w-2 h-2 rounded-full ${filterOnlyDelayed ? "bg-white" : "bg-red-600 animate-ping"}`}></span>
+                <span>⚠️ {delayedCount} {delayedCount === 1 ? "Valija Demorada" : "Valijas Demoradas"} (+{SLA_DELAY_DAYS}d)</span>
+                {filterOnlyDelayed && <span className="ml-1 text-[10px] underline">Ver todos</span>}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyDelayedClaimEmail}
+                className="px-3.5 py-2 rounded-lg bg-[#00205B] hover:bg-[#00153D] text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                title="Copiar correo formal con tabla HTML de todas las valijas demoradas para pegar en Outlook"
+              >
+                <Copy className="w-3.5 h-3.5 text-[#FE5000]" />
+                <span>Copiar Correo de Reclamo</span>
+              </button>
+            </div>
+          )}
+          <button onClick={fetchData} className="p-2 text-gray-400 hover:text-[#00205B] hover:bg-gray-50 rounded-md transition-colors cursor-pointer" title="Actualizar datos">
             <svg className={`w-5 h-5 ${loading ? 'animate-spin text-[#00205B]' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
           </button>
           <div className="bg-[#FE5000]/10 border border-[#FE5000]/20 px-4 py-2 rounded-lg flex items-center shadow-sm">
@@ -432,14 +608,10 @@ export default function HistoricalTable() {
           <CustomSelect
             value={filterRegion}
             onChange={setFilterRegion}
-            className="w-48"
+            className="w-52"
             options={[
               { value: "", label: "Todas las Regiones" },
-              { value: "Capital", label: "Capital" },
-              { value: "Oriente", label: "Oriente" },
-              { value: "Occidente", label: "Occidente" },
-              { value: "Guayana", label: "Guayana" },
-              { value: "Los Andes", label: "Los Andes" }
+              ...availableRegionOptions.map((reg) => ({ value: reg, label: reg }))
             ]}
           />
         </div>
@@ -469,11 +641,11 @@ export default function HistoricalTable() {
         </div>
         
         {/* Clear Filters Button */}
-        {(filterRegion || filterEstado || filterAgency || filterDateStart || filterDateEnd) && (
+        {(filterRegion || filterEstado || filterAgency || filterDateStart || filterDateEnd || filterOnlyDelayed) && (
           <div className="flex flex-col justify-end">
              <button 
-                onClick={() => { setFilterRegion(""); setFilterEstado(""); setFilterAgency(""); setFilterDateStart(""); setFilterDateEnd(""); }}
-                className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-red-500 transition-colors flex items-center"
+                onClick={() => { setFilterRegion(""); setFilterEstado(""); setFilterAgency(""); setFilterDateStart(""); setFilterDateEnd(""); setFilterOnlyDelayed(false); }}
+                className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-red-500 transition-colors flex items-center cursor-pointer"
              >
                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                Limpiar Filtros
@@ -556,21 +728,32 @@ export default function HistoricalTable() {
                         <span className="w-1.5 h-1.5 rounded-full bg-[#009639] mr-1.5"></span>
                         Recibido
                       </span>
+                    ) : getDaysElapsed(row.fecha_despacho) >= SLA_DELAY_DAYS ? (
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <span className="inline-flex items-center px-2.5 py-1 text-[10px] font-black uppercase tracking-wide rounded-md bg-red-100 text-red-700 border border-red-300 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-600 mr-1.5 animate-ping"></span>
+                          Demorado ({getDaysElapsed(row.fecha_despacho)}d)
+                        </span>
+                      </div>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md bg-[#FE5000]/10 text-[#FE5000] border border-[#FE5000]/20">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#FE5000] mr-1.5 animate-pulse"></span>
-                        En Tránsito
+                        En Tránsito ({getDaysElapsed(row.fecha_despacho)}d)
                       </span>
                     )}
                   </td>
                   <td className="py-4 px-6 text-center">
-                    <button 
-                      onClick={() => handleDelete(row.id)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50"
-                      title="Eliminar registro"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    {isAdmin ? (
+                      <button 
+                        onClick={() => handleDelete(row.id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50"
+                        title="Eliminar registro (Solo Administrador)"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    ) : (
+                      <span className="text-gray-300 text-xs" title="Eliminación reservada para Administradores">—</span>
+                    )}
                   </td>
                 </tr>
               ))

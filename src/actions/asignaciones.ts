@@ -23,8 +23,11 @@ export async function getAsignacionesPaginated(
 
   // Aplicar filtros dinámicos si existen
   if (filters.search) {
-    // Buscamos por código de agencia o por nombre de agencia (si la vista lo trae)
-    query = query.or(`codigo_agencia.ilike.%${filters.search}%,agencia_nombre.ilike.%${filters.search}%`);
+    // Sanitizar caracteres especiales de sintaxis PostgREST (.or) como comas y paréntesis
+    const safeSearch = filters.search.replace(/[,()]/g, " ").trim();
+    if (safeSearch) {
+      query = query.or(`codigo_agencia.ilike.%${safeSearch}%,agencia_nombre.ilike.%${safeSearch}%`);
+    }
   }
   if (filters.estado) {
     query = query.eq("agencia_estado", filters.estado);

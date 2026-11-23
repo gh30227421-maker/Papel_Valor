@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { verifyDispatch, confirmDispatch } from '@/actions/recepcion';
 import { PackageOpen, CheckCircle, Search, AlertCircle, Building, CreditCard, User, FileText } from 'lucide-react';
 
@@ -20,6 +20,35 @@ export default function RecepcionPage() {
   // Paso 2 Datos
   const [recibidoPor, setRecibidoPor] = useState('');
   const [observaciones, setObservaciones] = useState('');
+
+  // Auto-llenado y auto-verificación cuando se escanea el código QR de la etiqueta de la valija
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const ag = params.get('agencia')?.trim() || '';
+    const ini = params.get('ini')?.trim() || '';
+    const fin = params.get('fin')?.trim() || '';
+
+    if (ag) setCodigoAgencia(ag);
+    if (ini) setCorrelativoInicial(ini);
+    if (fin) setCorrelativoFinal(fin);
+
+    // Si el QR trae los 3 datos completos (etiqueta de despacho registrado), validamos automáticamente
+    if (ag && ini && fin) {
+      setLoading(true);
+      verifyDispatch(ag, ini, fin)
+        .then((res) => {
+          if (res.success && res.data) {
+            setDespacho(res.data);
+            setStep(2);
+          } else if (res.message) {
+            setErrorMsg(res.message);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, []);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();

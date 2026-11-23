@@ -2,7 +2,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { createClient as createAuthClient } from "@/lib/supabase/client";
+import { getStockStats } from "@/actions/dashboard";
+import { saveStockCustodia } from "@/actions/custodia";
 import CustomSelect from "./ui/CustomSelect";
+import AgencyCombobox from "./ui/AgencyCombobox";
 import { getLocalTodayDate } from "@/lib/dateUtils";
 
 type AgencyData = {
@@ -20,12 +24,85 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
   const [agencyData, setAgencyData] = useState<AgencyData | null>(null);
   const [agencyError, setAgencyError] = useState("");
   const [isSearchingAgency, setIsSearchingAgency] = useState(false);
+  const [allAgencies, setAllAgencies] = useState<AgencyData[]>([]);
+  const [lastCorrelativeUsed, setLastCorrelativeUsed] = useState<string>("");
+  const [bovedaDisponible, setBovedaDisponible] = useState<number | null>(null);
+  const [custodiaActual, setCustodiaActual] = useState<number>(0);
+  const [deductFromCustodia, setDeductFromCustodia] = useState<boolean>(false);
   
   const [initialCorrelative, setInitialCorrelative] = useState("");
   const [finalCorrelative, setFinalCorrelative] = useState("");
   const [correlativeError, setCorrelativeError] = useState("");
   
   const [elaborator, setElaborator] = useState("");
+  const [operatorOptions, setOperatorOptions] = useState([
+    { value: "Rhainy Hernandez", label: "Rhainy Hernandez" },
+    { value: "Alfredo Machado", label: "Alfredo Machado" },
+  ]);
+
+  useEffect(() => {
+    const loadOperators = async () => {
+      try {
+        const names = new Set<string>(["Rhainy Hernandez", "Alfredo Machado"]);
+        const authSupabase = createAuthClient();
+        const { data: perfiles } = await authSupabase
+          .from("perfiles")
+          .select("nombre, rol")
+          .in("rol", ["admin", "usuario"]);
+
+        if (perfiles) {
+          perfiles.forEach((p: any) => {
+            if (p.nombre && p.nombre.trim()) {
+              names.add(p.nombre.trim());
+            }
+          });
+        }
+
+        const { data: { user } } = await authSupabase.auth.getUser();
+        if (user) {
+          const { data: myProfile } = await authSupabase
+            .from("perfiles")
+            .select("nombre")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (myProfile?.nombre?.trim()) {
+            const myName = myProfile.nombre.trim();
+            names.add(myName);
+            setElaborator((prev) => prev || myName);
+          }
+        }
+
+        setOperatorOptions(
+          Array.from(names).map((n) => ({ value: n, label: n }))
+        );
+      } catch (e) {
+        // Fallback silencioso a las opciones predeterminadas
+      }
+    };
+    loadOperators();
+
+    // Cargar catálogo de agencias para el buscador por Nombre/Código, último correlativo y saldo de Bóveda
+    const loadCatalogAndLastCorr = async () => {
+      try {
+        const [{ data: ags }, { data: lastDesp }, stockInfo] = await Promise.all([
+          supabase.from("agencias").select("codigo, nombre, region, estado, zona, gerente").order("nombre"),
+          supabase.from("despachos").select("correlativo_final").order("created_at", { ascending: false }).limit(1),
+          getStockStats("").catch(() => null)
+        ]);
+        if (ags) setAllAgencies(ags as AgencyData[]);
+        if (lastDesp && lastDesp.length > 0 && lastDesp[0].correlativo_final) {
+          setLastCorrelativeUsed(lastDesp[0].correlativo_final.replace(/\D/g, ""));
+        }
+        if (stockInfo) {
+          setBovedaDisponible(Number(stockInfo.stock_boveda) || 0);
+          setCustodiaActual(Number(stockInfo.stock_custodia) || 0);
+        }
+      } catch {
+        // Ignore
+      }
+    };
+    loadCatalogAndLastCorr();
+  }, []);
   
   const [showPreview, setShowPreview] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -106,6 +183,37 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
     setCorrelativeError("");
   };
 
+  // Calcula un correlativo de 16 dígitos sumando delta a los dígitos centrales [8..14]
+  const computeCorrelativeOffset = (base16: string, delta: number): string | null => {
+    if (base16.length !== 16 || !/^\d+$/.test(base16)) return null;
+    const prefix = base16.substring(0, 8);
+    const serialNum = parseInt(base16.substring(8, 14), 10);
+    const suffix = base16.substring(14, 16);
+    const nextSerial = serialNum + delta;
+    if (nextSerial < 0 || nextSerial > 999999) return null;
+    return `${prefix}${String(nextSerial).padStart(6, "0")}${suffix}`;
+  };
+
+  const handleApplyQuickBatch = (batchSize: number) => {
+    if (!isValidInitial) return;
+    const computedFinal = computeCorrelativeOffset(initialCorrelative, batchSize - 1);
+    if (computedFinal) {
+      setFinalCorrelative(computedFinal);
+      setCorrelativeError("");
+      setTimeout(() => despacharBtnRef.current?.focus(), 50);
+    }
+  };
+
+  const handleSuggestNextInitial = () => {
+    if (!lastCorrelativeUsed || lastCorrelativeUsed.length !== 16) return;
+    const nextInitial = computeCorrelativeOffset(lastCorrelativeUsed, 1);
+    if (nextInitial) {
+      setInitialCorrelative(nextInitial);
+      setCorrelativeError("");
+      setTimeout(() => finalCorrelativeRef.current?.focus(), 50);
+    }
+  };
+
   const handleSubmit = async () => {
     setCorrelativeError("");
     setIsSubmitting(true);
@@ -155,6 +263,19 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
     setIsSubmitting(false);
     setShowPreview(false);
     setSuccessMessage("Despacho registrado y centralizado exitosamente en Supabase.");
+    setLastCorrelativeUsed(finalCorrelative);
+    if (bovedaDisponible !== null) {
+      setBovedaDisponible(Math.max(0, bovedaDisponible - quantity));
+    }
+    if (deductFromCustodia && custodiaActual > 0) {
+      const nextCustodia = Math.max(0, custodiaActual - quantity);
+      setCustodiaActual(nextCustodia);
+      saveStockCustodia({
+        cantidad: nextCustodia,
+        concepto: "Custodia Bóveda Central (Descuento automático por despacho)",
+        observaciones: `Descontadas ${quantity} TDD despachadas a Agencia ${agencyData!.codigo}`,
+      }).catch(() => {});
+    }
     
     setAgencyCode("");
     setAgencyData(null);
@@ -215,11 +336,8 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                   <CustomSelect
                     value={elaborator}
                     onChange={setElaborator}
-                    className="w-40"
-                    options={[
-                      { value: "Rhainy Hernandez", label: "Rhainy Hernandez" },
-                      { value: "Alfredo Machado", label: "Alfredo Machado" },
-                    ]}
+                    className="w-44"
+                    options={operatorOptions}
                   />
                 </div>
              </div>
@@ -258,9 +376,25 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                 {agencyError && <p className="text-red-500 text-[9px] font-bold mt-1 absolute -bottom-4 animate-in fade-in">{agencyError}</p>}
              </div>
 
-             <div className="flex-1 min-w-[120px]">
-                <label className="block text-[9px] font-bold text-[#00205B] mb-1">Nombre de Agencia</label>
-                <input disabled value={agencyData?.nombre || ""} className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-700 font-semibold text-xs shadow-sm" placeholder="—" />
+             <div className="flex-1 min-w-[220px]">
+                <label className="block text-[9px] font-bold text-[#00205B] mb-1">Buscar Agencia por Nombre o Código</label>
+                <AgencyCombobox
+                  agencies={allAgencies}
+                  value={agencyData?.codigo || agencyCode}
+                  onChange={(selectedCode) => {
+                    setAgencyCode(selectedCode);
+                    const found = allAgencies.find(a => a.codigo === selectedCode);
+                    if (found) {
+                      setAgencyData(found);
+                      setAgencyError("");
+                      setTimeout(() => initialCorrelativeRef.current?.focus(), 80);
+                    } else if (!selectedCode) {
+                      setAgencyData(null);
+                      setAgencyError("");
+                    }
+                  }}
+                  placeholder={agencyData?.nombre || "Buscar agencia por nombre, ciudad o código..."}
+                />
              </div>
              
              <div className="w-full lg:w-32 shrink-0">
@@ -284,10 +418,28 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
             BLOQUE 2: ESCÁNER DE INVENTARIO Y TOTALIZADOR (COMPACTO)
             ========================================================= */}
         <div className="bg-white border-l-4 border-l-[#009639] rounded-lg shadow-sm border border-gray-200 p-4 relative">
-          <h3 className="text-xs font-black text-[#009639] mb-4 flex items-center uppercase tracking-wider">
-            <span className="bg-[#009639]/10 text-[#009639] w-6 h-6 flex items-center justify-center rounded mr-2 text-[10px]">2</span>
-            Escáner de Bloque Asignado
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="text-xs font-black text-[#009639] flex items-center uppercase tracking-wider">
+              <span className="bg-[#009639]/10 text-[#009639] w-6 h-6 flex items-center justify-center rounded mr-2 text-[10px]">2</span>
+              Escáner de Bloque Asignado
+            </h3>
+
+            {lastCorrelativeUsed && lastCorrelativeUsed.length === 16 && (
+              <div className="flex items-center gap-2 bg-blue-50/80 border border-blue-200/80 px-3 py-1 rounded-lg">
+                <span className="text-[10px] font-bold text-gray-500">
+                  Último despachado: <strong className="font-mono text-[#00205B]">{lastCorrelativeUsed.replace(/(.{4})/g, "$1 ").trim()}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSuggestNextInitial}
+                  className="text-[10px] font-black bg-[#00205B] hover:bg-[#00153D] text-white px-2 py-0.5 rounded shadow-2xs transition-colors cursor-pointer"
+                  title="Rellenar el Correlativo Inicial con el siguiente serial disponible (+1)"
+                >
+                  Usar Siguiente (+1)
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-col lg:flex-row gap-6 items-end">
             <div className="flex-1 w-full space-y-4">
@@ -339,8 +491,31 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
 
               {/* Input Correlativo Final */}
               <div className="relative group">
-                <div className="flex justify-between items-end mb-1">
-                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider">Correlativo Final (Lote)</label>
+                <div className="flex flex-wrap justify-between items-end gap-2 mb-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider">Correlativo Final (Lote)</label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] font-bold text-gray-400 mr-0.5">Autocalcular lote:</span>
+                      {[
+                        { qty: 250, label: "+250" },
+                        { qty: 500, label: "+500 (1 Blíster)" },
+                        { qty: 1000, label: "+1.000 (2 Blíster)" },
+                        { qty: 1500, label: "+1.500 (3 Blíster)" },
+                        { qty: 2000, label: "+2.000" },
+                      ].map((preset) => (
+                        <button
+                          key={preset.qty}
+                          type="button"
+                          disabled={!isValidInitial}
+                          onClick={() => handleApplyQuickBatch(preset.qty)}
+                          className="px-2 py-0.5 text-[9.5px] font-black rounded border border-emerald-200 bg-emerald-50 text-[#009639] hover:bg-[#009639] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          title={`Autocompletar correlativo final para ${preset.qty} tarjetas`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${finalCorrelative.length === 16 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                     {finalCorrelative.length}/16
                   </span>
@@ -391,13 +566,35 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
               )}
             </div>
 
-            {/* TOTALIZADOR DINÁMICO HORIZONTAL */}
-            <div className={`w-full lg:w-64 shrink-0 p-5 rounded-lg border-2 transition-all duration-300 flex flex-col justify-center items-center h-full min-h-[160px] ${quantity > 0 ? 'bg-[#009639]/10 border-[#009639]/30' : 'bg-gray-50 border-gray-100'}`}>
+            {/* TOTALIZADOR DINÁMICO HORIZONTAL + SALDO BÓVEDA EN VIVO */}
+            <div className={`w-full lg:w-72 shrink-0 p-4 rounded-lg border-2 transition-all duration-300 flex flex-col justify-center items-center h-full min-h-[160px] ${quantity > 0 ? 'bg-[#009639]/10 border-[#009639]/30' : 'bg-gray-50 border-gray-100'}`}>
               <span className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1 text-center">Volumen Neto</span>
-              <span className={`text-5xl font-black tracking-tighter my-2 ${quantity > 0 ? 'text-[#009639]' : 'text-gray-300'}`}>
+              <span className={`text-5xl font-black tracking-tighter my-1.5 ${quantity > 0 ? 'text-[#009639]' : 'text-gray-300'}`}>
                 {formattedQuantity}
               </span>
               <span className={`text-xs font-bold text-center ${quantity > 0 ? 'text-[#009639]' : 'text-gray-400'}`}>Plásticos TDD</span>
+
+              {bovedaDisponible !== null && (
+                <div className="w-full mt-3 pt-2.5 border-t border-gray-200/80 text-center space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-bold px-1">
+                    <span className="text-gray-500 uppercase">Bóveda Central:</span>
+                    <span className="font-mono font-black text-[#00205B]">
+                      {Math.max(0, bovedaDisponible - (quantity > 0 ? quantity : 0)).toLocaleString("es-VE")} TDD
+                    </span>
+                  </div>
+                  {custodiaActual > 0 && (
+                    <label className="flex items-center justify-center gap-1.5 text-[9.5px] font-bold text-[#FE5000] bg-orange-50 border border-orange-200/80 rounded px-2 py-1 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={deductFromCustodia}
+                        onChange={(e) => setDeductFromCustodia(e.target.checked)}
+                        className="w-3 h-3 rounded text-[#FE5000] cursor-pointer"
+                      />
+                      <span>Descontar de Custodia ({custodiaActual.toLocaleString("es-VE")})</span>
+                    </label>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

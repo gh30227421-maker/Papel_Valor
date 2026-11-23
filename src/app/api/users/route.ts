@@ -49,6 +49,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Faltan datos obligatorios' }, { status: 400 })
     }
 
+    const validRoles = ['admin', 'usuario', 'invitado']
+    if (!validRoles.includes(rol)) {
+      return NextResponse.json({ error: 'Rol inválido. Debe ser admin, usuario o invitado.' }, { status: 400 })
+    }
+
     // 4. Creamos un Cliente Supabase de ADMINISTRADOR usando la SERVICE_ROLE_KEY
     // Esta llave ignora el RLS y tiene poder absoluto. Solo existe en el servidor.
     const supabaseAdmin = createSupabaseClient(

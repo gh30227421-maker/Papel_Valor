@@ -44,7 +44,21 @@ export default function TrackerSearch() {
     const termClean = searchTerm.replace(/\D/g, "");
     const termSpaced = termClean.replace(/(.{4})/g, '$1 ').trim();
 
-    // 1. Primero buscamos en el stock real (físico)
+    // 1. Primero intentamos usar la función RPC optimizada en PostgreSQL (si ya fue instalada)
+    try {
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc("fn_rastrear_correlativo", {
+        p_correlativo: termClean
+      });
+      if (!rpcErr && rpcResult && rpcResult.found) {
+        setResult(rpcResult.data as any);
+        setIsSearching(false);
+        return;
+      }
+    } catch {
+      // Fallback transparente a la búsqueda tradicional si el RPC aún no existe
+    }
+
+    // 2. Fallback: buscamos en el stock real (físico)
     // Intentamos coincidencia exacta o que contenga el número (por si está escrito con/sin espacios)
     let { data: stockData, error: stockError } = await supabase
       .from("stock_actual")
@@ -61,6 +75,7 @@ export default function TrackerSearch() {
 
     // Si no hubo coincidencia directa, buscamos si está dentro de un rango (ej: A-B)
     if (!stockData && termClean.length > 0) {
+      const prefix = termClean.substring(0, 6);
       const { data: allStock } = await supabase
         .from("stock_actual")
         .select(`
@@ -70,7 +85,8 @@ export default function TrackerSearch() {
           correlativo,
           updated_at
         `)
-        .ilike('correlativo', '%-%'); // Solo traemos los rangos
+        .ilike('correlativo', `${prefix}%-%`)
+        .limit(500); // Limitamos para no saturar la memoria del navegador
 
       if (allStock) {
         try {
@@ -214,7 +230,7 @@ export default function TrackerSearch() {
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Tarjeta Localizada</h3>
                 {result.source === 'stock' ? (
-                  <p className="text-sm text-gray-500">En inventario físico al {new Date(result.updated_at).toLocaleString('es-VE')}</p>
+                  <p className="text-sm text-gray-500">En inventario físico al {result.updated_at ? new Date(result.updated_at).toLocaleString('es-VE') : '—'}</p>
                 ) : (
                   <p className="text-sm text-gray-500">Pertenece al lote despachado el {formatDisplayDate(result.fecha_despacho)}</p>
                 )}

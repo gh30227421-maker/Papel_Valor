@@ -1,11 +1,73 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 import { getStockCustodia } from "./custodia";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+const normalizeStr = (str: string) =>
+  str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim() : "";
+
+const STATE_TO_REGION_MAP: Record<string, string> = {
+  "ARAGUA": "ARAGUA - LOS LLANOS",
+  "GUARICO": "ARAGUA - LOS LLANOS",
+  "APURE": "ARAGUA - LOS LLANOS",
+  "MERIDA": "OCCIDENTE - ANDES",
+  "TACHIRA": "OCCIDENTE - ANDES",
+  "ZULIA": "OCCIDENTE - ANDES",
+  "FALCON": "OCCIDENTE - ANDES",
+  "TRUJILLO": "OCCIDENTE - ANDES",
+  "CARABOBO": "CENTRO OCCIDENTE",
+  "BARINAS": "CENTRO OCCIDENTE",
+  "LARA": "CENTRO OCCIDENTE",
+  "YARACUY": "CENTRO OCCIDENTE",
+  "COJEDES": "CENTRO OCCIDENTE",
+  "PORTUGUESA": "CENTRO OCCIDENTE",
+  "MIRANDA": "CAPITAL",
+  "LA GUAIRA": "CAPITAL",
+  "DISTRITO CAPITAL": "CAPITAL",
+  "ANZOATEGUI": "ORIENTE",
+  "SUCRE": "ORIENTE",
+  "NUEVA ESPARTA": "ORIENTE",
+  "BOLIVAR": "ORIENTE",
+  "MONAGAS": "ORIENTE",
+  "DELTA AMACURO": "ORIENTE"
+};
+
+let cachedAgenciasByEstado: Map<string, string[]> | null = null;
+let cachedAgenciasTimestamp = 0;
+
+async function getAgenciasByEstado(estadoName: string): Promise<string[]> {
+  const now = Date.now();
+  if (!cachedAgenciasByEstado || now - cachedAgenciasTimestamp > 300_000) {
+    const { data } = await supabase.from("agencias").select("codigo, estado");
+    const map = new Map<string, string[]>();
+    if (data) {
+      data.forEach((ag: any) => {
+        if (ag.estado && ag.codigo) {
+          const normEst = normalizeStr(ag.estado);
+          const list = map.get(normEst) || [];
+          list.push(ag.codigo);
+          map.set(normEst, list);
+        }
+      });
+    }
+    cachedAgenciasByEstado = map;
+    cachedAgenciasTimestamp = now;
+  }
+
+  const target = normalizeStr(estadoName);
+  const matchedCodes: string[] = [];
+  cachedAgenciasByEstado.forEach((codes, estKey) => {
+    if (estKey === target || estKey.includes(target) || target.includes(estKey)) {
+      matchedCodes.push(...codes);
+    }
+  });
+  return matchedCodes.length > 0 ? matchedCodes : ["__NONE__"];
+}
 
 const mapIntFilter = (arr?: string[] | string) => {
   if (!arr) return null;
@@ -23,12 +85,24 @@ const mapTextFilter = (arr?: string[] | string) => {
   return array;
 };
 
-export async function getDashboardStats(filters: { year?: string | string[]; month?: string | string[]; day?: string | string[]; region?: string | string[]; agencia?: string | string[] } = {}) {
+export async function getDashboardStats(filters: { year?: string | string[]; month?: string | string[]; day?: string | string[]; region?: string | string[]; estado?: string; agencia?: string | string[] } = {}) {
   const p_years = mapIntFilter(filters.year);
   const p_months = mapIntFilter(filters.month);
   const p_days = mapIntFilter(filters.day);
   const p_regions = mapTextFilter(filters.region);
-  const p_agencias = mapTextFilter(filters.agencia);
+  let p_agencias = mapTextFilter(filters.agencia);
+
+  // Si hay un filtro de Estado activo, resolvemos las agencias que pertenecen a ese Estado
+  // para que funcione tanto con fn_dashboard_stats_v7 actual como con la nueva versión optimizada
+  if (filters.estado && filters.estado !== "Todos" && filters.estado !== "Todas" && filters.estado !== "") {
+    const estadoAgencias = await getAgenciasByEstado(filters.estado);
+    if (p_agencias && !p_agencias.includes("__NONE__")) {
+      const intersection = p_agencias.filter((code) => estadoAgencias.includes(code));
+      p_agencias = intersection.length > 0 ? intersection : ["__NONE__"];
+    } else if (!p_agencias) {
+      p_agencias = estadoAgencias;
+    }
+  }
 
   const { data, error } = await supabase.rpc("fn_dashboard_stats_v7", {
     p_years,
@@ -88,11 +162,26 @@ export async function getStockStats(region: string = "") {
       stock_nomina: 0,
       stock_agencias: 0,
       stock_global: custodiaQty,
+      total_asignaciones_2026: 0,
       top_agencias: [],
       regiones: [],
       estados: [],
       proyeccion: []
     };
+  }
+
+  // Si el RPC optimizado aún no devuelve total_asignaciones_2026, hacemos un fallback ligero a mv_dashboard_summary
+  let totalAsig2026 = data.total_asignaciones_2026;
+  if (typeof totalAsig2026 !== "number") {
+    try {
+      const { data: mvRows } = await supabase
+        .from("mv_dashboard_summary")
+        .select("total_asignaciones")
+        .eq("anio", 2026);
+      totalAsig2026 = (mvRows || []).reduce((acc: number, r: any) => acc + (Number(r.total_asignaciones) || 0), 0);
+    } catch {
+      totalAsig2026 = 0;
+    }
   }
 
   // Si el RPC ya incluye stock_custodia, lo respetamos; de lo contrario sumamos la custodia manual
@@ -112,6 +201,7 @@ export async function getStockStats(region: string = "") {
     stock_boveda_sistema: bovedaSistema,
     stock_custodia: custodiaQty,
     stock_global: globalTotal,
+    total_asignaciones_2026: totalAsig2026,
   };
 }
 
@@ -134,10 +224,20 @@ export async function getFiltrosBasicos() {
     agencias: data.agencias || []
   };
 }
-export async function getMonthlyPivot(filters: { year?: string | string[]; region?: string | string[]; agencia?: string | string[] } = {}) {
+export async function getMonthlyPivot(filters: { year?: string | string[]; region?: string | string[]; estado?: string; agencia?: string | string[] } = {}) {
   const p_years = mapIntFilter(filters.year);
   const p_regions = mapTextFilter(filters.region);
-  const p_agencias = mapTextFilter(filters.agencia);
+  let p_agencias = mapTextFilter(filters.agencia);
+
+  if (filters.estado && filters.estado !== "Todos" && filters.estado !== "Todas" && filters.estado !== "") {
+    const estadoAgencias = await getAgenciasByEstado(filters.estado);
+    if (p_agencias && !p_agencias.includes("__NONE__")) {
+      const intersection = p_agencias.filter((code) => estadoAgencias.includes(code));
+      p_agencias = intersection.length > 0 ? intersection : ["__NONE__"];
+    } else if (!p_agencias) {
+      p_agencias = estadoAgencias;
+    }
+  }
 
   const { data, error } = await supabase.rpc("fn_dashboard_monthly_pivot_v7", {
     p_years,
@@ -186,6 +286,18 @@ export async function getDashboardLastUpdate() {
 }
 
 export async function forceRefreshDashboard() {
+  // Verificamos que exista una sesión autenticada antes de ejecutar el refresh pesado
+  try {
+    const serverClient = await createServerClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    if (!user) {
+      console.warn("Intento no autenticado de refrescar el dashboard bloqueado.");
+      return false;
+    }
+  } catch (e) {
+    // Continuar si el entorno no tiene cookies disponibles
+  }
+
   const { error } = await supabase.rpc("fn_refresh_dashboard_mv");
   if (error) {
     console.error("Error refreshing dashboard:", error);

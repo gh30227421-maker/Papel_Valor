@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import useSWR from "swr";
 import LoadingOverlay from "./LoadingOverlay";
 import { getDashboardStats, getFiltrosBasicos, getMonthlyPivot, getDashboardLastUpdate, forceRefreshDashboard } from "@/actions/dashboard";
-import { 
+import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList,
   AreaChart, Area
@@ -55,18 +55,19 @@ const REGION_MAPPING: Record<string, string> = {
 
 export default function DashboardStats() {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // Catálogos para filtros
   const [catYears, setCatYears] = useState<string[]>([]);
   const [catRegions, setCatRegions] = useState<string[]>([]);
   const [catAgencias, setCatAgencias] = useState<any[]>([]);
+  const [catEstados, setCatEstados] = useState<string[]>([]);
 
   // Filtros Seleccionados (ahora arreglos)
   const [selectedYear, setSelectedYear] = useState<string[]>(["2026"]);
   const [selectedMonth, setSelectedMonth] = useState<string[]>(["Todos"]);
   const [selectedDay, setSelectedDay] = useState<string[]>(["Todos"]);
   const [selectedRegion, setSelectedRegion] = useState<string[]>(["Todas"]);
-  const [selectedEstado, setSelectedEstado] = useState<string>("Todos"); // Este lo dejamos single por ahora o MultiSelect? MultiSelect
+  const [selectedEstado, setSelectedEstado] = useState<string>("Todos");
   const [selectedAgencia, setSelectedAgencia] = useState<string[]>(["Todas"]);
   const [mapTab, setMapTab] = useState<"estados" | "regiones">("regiones");
 
@@ -75,9 +76,9 @@ export default function DashboardStats() {
     const res = new Set<string>();
     months.forEach(m => {
       if (m === "1er Semestre") {
-        ['1','2','3','4','5','6'].forEach(x => res.add(x));
+        ['1', '2', '3', '4', '5', '6'].forEach(x => res.add(x));
       } else if (m === "2do Semestre") {
-        ['7','8','9','10','11','12'].forEach(x => res.add(x));
+        ['7', '8', '9', '10', '11', '12'].forEach(x => res.add(x));
       } else {
         res.add(m);
       }
@@ -93,11 +94,13 @@ export default function DashboardStats() {
         month: resolvedMonths,
         day: selectedDay,
         region: selectedRegion,
+        estado: selectedEstado,
         agencia: selectedAgencia
       }),
       getMonthlyPivot({
         year: selectedYear,
         region: selectedRegion,
+        estado: selectedEstado,
         agencia: selectedAgencia
       }),
       getDashboardLastUpdate()
@@ -106,15 +109,25 @@ export default function DashboardStats() {
   };
 
   const { data: swrData, isValidating, mutate } = useSWR(
-    ["dashboard-stats", JSON.stringify(selectedYear), JSON.stringify(selectedMonth), JSON.stringify(selectedDay), JSON.stringify(selectedRegion), JSON.stringify(selectedAgencia)],
+    ["dashboard-stats", JSON.stringify(selectedYear), JSON.stringify(selectedMonth), JSON.stringify(selectedDay), JSON.stringify(selectedRegion), selectedEstado, JSON.stringify(selectedAgencia)],
     fetcher,
-    { revalidateOnFocus: false, keepPreviousData: true }
+    { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 5000 }
   );
 
   const stats = swrData?.data || null;
   const pivotData = swrData?.pivot || [];
   const lastUpdate = swrData?.lastUpdateData || null;
   const loading = !swrData && isValidating;
+
+  // Mantener la lista completa de estados disponibles en el selector aunque se filtre por uno solo
+  useEffect(() => {
+    if (stats?.estados && stats.estados.length > 1) {
+      const uniqueEst = Array.from(new Set(stats.estados.map((e: any) => e.id).filter(Boolean))).sort() as string[];
+      if (uniqueEst.length > catEstados.length) {
+        setCatEstados(uniqueEst);
+      }
+    }
+  }, [stats?.estados, catEstados.length]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -144,7 +157,7 @@ export default function DashboardStats() {
   // Cálculos para las tarjetas KPI
   const totalTDD = stats?.total || 0;
   const promedioDiario = stats?.promedio_diario || 0;
-  
+
   const findTrans = (code: string) => stats?.transacciones?.find((t: any) => t.name === code)?.value || 0;
   const primeraVez = findTrans("511");
   const migraciones = findTrans("522") + findTrans("570");
@@ -153,16 +166,16 @@ export default function DashboardStats() {
   // Preparar Data para Top 5 Estados/Regiones
   const estadosData = [...(stats?.estados || [])].sort((a: any, b: any) => b.value - a.value);
   const regionesData = [...(stats?.regiones || [])].sort((a: any, b: any) => b.value - a.value);
-  
+
   const top5DataList = mapTab === "estados" ? estadosData.slice(0, 5) : regionesData.slice(0, 5);
-  
+
   const getEstadoColor = (estadoName: string, value: number) => {
-    if (value === 0) return "#E5E7EB"; 
+    if (value === 0) return "#E5E7EB";
     const index = estadosData.findIndex(e => e.id.toLowerCase().includes(estadoName.toLowerCase()) || estadoName.toLowerCase().includes(e.id.toLowerCase()));
-    
-    if (index >= 0 && index <= 2) return "#FE5000"; 
-    if (index >= 3 && index <= 4) return "#009639"; 
-    return "#00205B"; 
+
+    if (index >= 0 && index <= 2) return "#FE5000";
+    if (index >= 3 && index <= 4) return "#009639";
+    return "#00205B";
   };
 
   // Data del Gráfico de Torta (Dinámico con los nombres reales y desglose exacto)
@@ -173,7 +186,7 @@ export default function DashboardStats() {
 
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, value }: any) => {
     const RADIAN = Math.PI / 180;
-    const radius = outerRadius + 20; 
+    const radius = outerRadius + 20;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
@@ -181,11 +194,11 @@ export default function DashboardStats() {
     if (value === 0) return null; // Solo ocultar si es literalmente cero
 
     return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="#00205B" 
-        textAnchor={x > cx ? 'start' : 'end'} 
+      <text
+        x={x}
+        y={y}
+        fill="#00205B"
+        textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
         className="text-[10px] font-bold"
       >
@@ -196,16 +209,16 @@ export default function DashboardStats() {
 
   return (
     <div className="w-full bg-[#F5F7FA] font-sans pb-12">
-      
+
       {/* 1. BARRA DE FILTROS SUPERIOR (FULL WIDTH) */}
       <div className="bg-white border-y border-gray-200 py-2 px-3 mb-6 w-full shadow-sm">
         <div className="w-full flex flex-col xl:flex-row xl:items-center justify-between gap-2">
           <div className="flex-1 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-2">
-            
+
             {/* Filtro: Operativo / Agencia */}
             <div>
               <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">OPERATIVO / AGENCIA</label>
-              <MultiSelect 
+              <MultiSelect
                 values={selectedAgencia}
                 onChange={setSelectedAgencia}
                 buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
@@ -226,7 +239,7 @@ export default function DashboardStats() {
             {/* Filtro: Mes / Periodo */}
             <div>
               <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">AÑO / PERIODO</label>
-              <MultiSelect 
+              <MultiSelect
                 values={selectedYear}
                 onChange={setSelectedYear}
                 buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
@@ -238,7 +251,7 @@ export default function DashboardStats() {
             {/* Filtro: Mes */}
             <div>
               <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">MES</label>
-              <MultiSelect 
+              <MultiSelect
                 values={selectedMonth}
                 onChange={(vals) => {
                   setSelectedMonth(vals);
@@ -272,14 +285,14 @@ export default function DashboardStats() {
             {selectedMonth.length > 0 && !selectedMonth.includes("Todos") && (
               <div>
                 <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">DÍA(S)</label>
-                <MultiSelect 
+                <MultiSelect
                   values={selectedDay}
                   onChange={setSelectedDay}
                   buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
                   icon={<svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
                   options={[
                     { value: "Todos", label: "Todos" },
-                    ...Array.from({length: 31}, (_, i) => ({ value: (i + 1).toString(), label: `Día ${i + 1}` }))
+                    ...Array.from({ length: 31 }, (_, i) => ({ value: (i + 1).toString(), label: `Día ${i + 1}` }))
                   ]}
                 />
               </div>
@@ -288,7 +301,7 @@ export default function DashboardStats() {
             {/* Filtro: Región */}
             <div>
               <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">REGIÓN</label>
-              <MultiSelect 
+              <MultiSelect
                 values={selectedRegion}
                 onChange={setSelectedRegion}
                 buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
@@ -300,22 +313,22 @@ export default function DashboardStats() {
             {/* Filtro: Estado */}
             <div>
               <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">ESTADO</label>
-              <CustomSelect 
+              <CustomSelect
                 value={selectedEstado}
                 onChange={setSelectedEstado}
                 buttonClassName="text-[11px] py-1 min-h-[28px] pl-2 rounded"
                 icon={<svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>}
                 options={[
                   { value: "Todos", label: "Seleccionar..." },
-                  ...(stats?.estados || []).map((e: any) => ({ value: e.id, label: e.id }))
+                  ...(catEstados.length > 0 ? catEstados.map(id => ({ value: id, label: id })) : (stats?.estados || []).map((e: any) => ({ value: e.id, label: e.id })))
                 ]}
               />
             </div>
-            
+
           </div>
           <div className="flex flex-col items-end justify-end gap-1.5 shrink-0 ml-2">
             <div className="flex items-center gap-2">
-              <button 
+              <button
                 onClick={handleManualRefresh}
                 disabled={isRefreshing}
                 className="px-3 py-1.5 bg-[#FE5000] border border-[#FE5000] rounded text-[11px] font-bold text-white hover:bg-[#e04800] flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-sm"
@@ -323,7 +336,7 @@ export default function DashboardStats() {
                 <svg className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 {isRefreshing ? 'Sincronizando...' : 'Sincronizar'}
               </button>
-              <button 
+              <button
                 onClick={() => { setSelectedYear(["Todos"]); setSelectedMonth(["Todos"]); setSelectedDay(["Todos"]); setSelectedRegion(["Todas"]); setSelectedEstado("Todos"); setSelectedAgencia(["Todas"]); }}
                 className="px-3 py-1.5 bg-white border border-gray-300 rounded text-[11px] font-bold text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 shadow-sm"
               >
@@ -333,9 +346,9 @@ export default function DashboardStats() {
             </div>
             {lastUpdate && (
               <span className="text-[9px] font-bold text-gray-400 mt-0.5">
-                ACTUALIZADO: {new Date(lastUpdate).toLocaleString('es-VE', { 
-                  day: '2-digit', month: '2-digit', year: 'numeric', 
-                  hour: '2-digit', minute: '2-digit', hour12: true 
+                ACTUALIZADO: {new Date(lastUpdate).toLocaleString('es-VE', {
+                  day: '2-digit', month: '2-digit', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit', hour12: true
                 })}
               </span>
             )}
@@ -344,10 +357,10 @@ export default function DashboardStats() {
       </div>
 
       <div className="w-full space-y-4">
-        
+
         {/* 2. TARJETAS KPI REDUCIDAS PARA ENCAJAR 100% ZOOM */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-start">
             <div>
               <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">TOTAL TDD ASIGNADAS</h3>
@@ -406,31 +419,46 @@ export default function DashboardStats() {
             </div>
           </div>
         </div>
-          {/* 3. DOS COLUMNAS PRINCIPALES */}
+        {/* 3. DOS COLUMNAS PRINCIPALES */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          
+
           {/* COLUMNA IZQUIERDA: MAPA Y TOP ESTADOS/REGIONES */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col h-[480px]">
             <div className="flex justify-between items-start mb-4 shrink-0">
               <div>
                 <h2 className="text-base font-bold text-[#00205B] leading-tight">Despliegue y Captación de TDD</h2>
-                <p className="text-[10px] text-gray-400 mt-0.5">Distribución geográfica y volumen de asignaciones</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Haz clic sobre cualquier región o estado del mapa para filtrar en vivo</p>
               </div>
-              <div className="flex space-x-1 bg-slate-50 p-1 rounded-md border border-gray-100">
-                <button 
-                  onClick={() => setMapTab("regiones")}
-                  className={`px-3 py-1 rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors ${mapTab === "regiones" ? "bg-white shadow-sm text-[#00205B] border border-gray-200" : "text-gray-500 hover:bg-gray-100"}`}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                  Por Regiones
-                </button>
-                <button 
-                  onClick={() => setMapTab("estados")}
-                  className={`px-3 py-1 rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors ${mapTab === "estados" ? "bg-white shadow-sm text-[#00205B] border border-gray-200" : "text-gray-500 hover:bg-gray-100"}`}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  Por Estados
-                </button>
+              <div className="flex items-center gap-2">
+                {((!selectedRegion.includes("Todas") && selectedRegion.length > 0) || (selectedEstado && selectedEstado !== "Todos")) && (
+                  <button
+                    onClick={() => {
+                      setSelectedRegion(["Todas"]);
+                      setSelectedEstado("Todos");
+                    }}
+                    className="px-2.5 py-1 rounded text-[10px] font-black bg-[#FE5000] text-white hover:bg-[#e04800] transition-colors shadow-xs cursor-pointer flex items-center gap-1"
+                    title="Quitar filtro geográfico activo"
+                  >
+                    <span>Ver todo el país</span>
+                    <span>✕</span>
+                  </button>
+                )}
+                <div className="flex space-x-1 bg-slate-50 p-1 rounded-md border border-gray-100">
+                  <button
+                    onClick={() => setMapTab("regiones")}
+                    className={`px-3 py-1 rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${mapTab === "regiones" ? "bg-white shadow-sm text-[#00205B] border border-gray-200" : "text-gray-500 hover:bg-gray-100"}`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                    Por Regiones
+                  </button>
+                  <button
+                    onClick={() => setMapTab("estados")}
+                    className={`px-3 py-1 rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${mapTab === "estados" ? "bg-white shadow-sm text-[#00205B] border border-gray-200" : "text-gray-500 hover:bg-gray-100"}`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    Por Estados
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -445,80 +473,108 @@ export default function DashboardStats() {
                   height={600}
                   style={{ width: "100%", height: "100%", minHeight: "300px" }}
                 >
-                  <Geographies geography={geoUrl}>
-                      {({ geographies }) =>
-                        geographies.map((geo) => {
-                          const stateNameRaw = geo.properties.NAME_1 || geo.properties.name || "";
-                          
-                          // Mapeo robusto manual para corregir los nombres corruptos del TopoJSON
-                          const rawUpper = stateNameRaw.toUpperCase();
-                          let cleanName = normalizeString(stateNameRaw);
-                          if (rawUpper.includes("ANZO")) cleanName = "ANZOATEGUI";
-                          if (rawUpper.includes("TACHIRA") || rawUpper.includes("TǭCHIRA")) cleanName = "TACHIRA";
-                          if (rawUpper.includes("GUARICO") || rawUpper.includes("GUǭRICO")) cleanName = "GUARICO";
-                          if (rawUpper.includes("MERIDA") || rawUpper.includes("MǸRIDA")) cleanName = "MERIDA";
-                          if (rawUpper.includes("FALC")) cleanName = "FALCON";
-                          if (rawUpper.includes("BOL")) cleanName = "BOLIVAR";
-                          if (rawUpper.includes("DELTA") || rawUpper.includes("AMACURO")) cleanName = "DELTA AMACURO";
-                          if (rawUpper.includes("NUEVA ESPARTA")) cleanName = "NUEVA ESPARTA";
-                          
-                          const foundState = stats?.estados?.find((e: any) => {
-                            const dbName = normalizeString(e.id);
-                            return dbName.includes(cleanName) || cleanName.includes(dbName);
-                          });
-                          
-                          const value = foundState ? foundState.value : 0;
-                          const regionName = REGION_MAPPING[cleanName] || "Desconocida";
-                          
-                          let fillColor = "#E5E7EB"; // Inactivo
-                          
-                          if (mapTab === "regiones") {
-                            const matchRegion = (r: any) => {
-                              const dbReg = normalizeString(r.id || r.name || "");
-                              const targetReg = normalizeString(regionName);
-                              return dbReg === targetReg || dbReg.includes(targetReg) || targetReg.includes(dbReg);
-                            };
-                            
-                            const regionData = stats?.regiones?.find(matchRegion);
-                            if (regionData && regionData.value > 0) {
-                              if (regionName === "ORIENTE") fillColor = "#00205B";
-                              else if (regionName === "ARAGUA - LOS LLANOS") fillColor = "#FE5000";
-                              else if (regionName === "CENTRO OCCIDENTE") fillColor = "#009639";
-                              else if (regionName === "OCCIDENTE - ANDES") fillColor = "#DC2626"; // Rojo
-                              else if (regionName === "CAPITAL") fillColor = "#EAB308"; // Amarillo
-                              else fillColor = "#9CA3AF";
-                            }
-                          } else {
-                            if (value > 0) {
-                              const index = estadosData.findIndex((e: any) => (e.id || e.name) === (foundState?.id || foundState?.name));
-                              if (index >= 0 && index <= 2) fillColor = "#FE5000"; // Top 1-3
-                              else if (index >= 3 && index <= 4) fillColor = "#009639"; // Top 4-5
-                              else fillColor = "#00205B"; // Otros activos
-                            }
+                  <Geographies geography={geoUrl as any}>
+                    {({ geographies }) =>
+                      geographies.map((geo) => {
+                        const stateNameRaw = geo.properties?.NAME_1 || geo.properties?.name || "";
+
+                        // Mapeo robusto manual para corregir los nombres corruptos del TopoJSON
+                        const rawUpper = stateNameRaw.toUpperCase();
+                        let cleanName = normalizeString(stateNameRaw);
+                        if (rawUpper.includes("ANZO")) cleanName = "ANZOATEGUI";
+                        if (rawUpper.includes("TACHIRA") || rawUpper.includes("TǭCHIRA")) cleanName = "TACHIRA";
+                        if (rawUpper.includes("GUARICO") || rawUpper.includes("GUǭRICO")) cleanName = "GUARICO";
+                        if (rawUpper.includes("MERIDA") || rawUpper.includes("MǸRIDA")) cleanName = "MERIDA";
+                        if (rawUpper.includes("FALC")) cleanName = "FALCON";
+                        if (rawUpper.includes("BOL")) cleanName = "BOLIVAR";
+                        if (rawUpper.includes("DELTA") || rawUpper.includes("AMACURO")) cleanName = "DELTA AMACURO";
+                        if (rawUpper.includes("NUEVA ESPARTA")) cleanName = "NUEVA ESPARTA";
+
+                        const foundState = stats?.estados?.find((e: any) => {
+                          const dbName = normalizeString(e.id);
+                          return dbName.includes(cleanName) || cleanName.includes(dbName);
+                        });
+
+                        const value = foundState ? foundState.value : 0;
+                        const regionName = REGION_MAPPING[cleanName] || "Desconocida";
+
+                        let fillColor = "#E5E7EB"; // Inactivo
+
+                        if (mapTab === "regiones") {
+                          const matchRegion = (r: any) => {
+                            const dbReg = normalizeString(r.id || r.name || "");
+                            const targetReg = normalizeString(regionName);
+                            return dbReg === targetReg || dbReg.includes(targetReg) || targetReg.includes(dbReg);
+                          };
+
+                          const regionData = stats?.regiones?.find(matchRegion);
+                          if (regionData && regionData.value > 0) {
+                            if (regionName === "ORIENTE") fillColor = "#00205B";
+                            else if (regionName === "ARAGUA - LOS LLANOS") fillColor = "#FE5000";
+                            else if (regionName === "CENTRO OCCIDENTE") fillColor = "#009639";
+                            else if (regionName === "OCCIDENTE - ANDES") fillColor = "#DC2626"; // Rojo
+                            else if (regionName === "CAPITAL") fillColor = "#EAB308"; // Amarillo
+                            else fillColor = "#9CA3AF";
                           }
-                          
-                          const tooltipText = mapTab === "regiones" 
-                            ? `Región ${regionName} (${cleanName}): ${value.toLocaleString()}`
-                            : `${cleanName}: ${value.toLocaleString()}`;
+                        } else {
+                          if (value > 0) {
+                            const index = estadosData.findIndex((e: any) => (e.id || e.name) === (foundState?.id || foundState?.name));
+                            if (index >= 0 && index <= 2) fillColor = "#FE5000"; // Top 1-3
+                            else if (index >= 3 && index <= 4) fillColor = "#009639"; // Top 4-5
+                            else fillColor = "#00205B"; // Otros activos
+                          }
+                        }
+
+                        const tooltipText = mapTab === "regiones" 
+                          ? `Región ${regionName} (${cleanName}): ${value.toLocaleString()} (Clic para filtrar)`
+                          : `${cleanName}: ${value.toLocaleString()} (Clic para filtrar)`;
+
+                          const handleMapGeographyClick = () => {
+                            if (mapTab === "regiones") {
+                              if (regionName && regionName !== "Desconocida") {
+                                const matchingCat = catRegions.find(r => normalizeString(r) === normalizeString(regionName));
+                                const targetReg = matchingCat || regionName;
+                                if (selectedRegion.length === 1 && normalizeString(selectedRegion[0]) === normalizeString(targetReg)) {
+                                  setSelectedRegion(["Todas"]);
+                                } else {
+                                  setSelectedRegion([targetReg]);
+                                  setSelectedEstado("Todos");
+                                }
+                              }
+                            } else {
+                              const matchingEst = catEstados.find(est => {
+                                const norm = normalizeString(est);
+                                return norm === cleanName || norm.includes(cleanName) || cleanName.includes(norm);
+                              }) || foundState?.id || cleanName;
+
+                              if (normalizeString(selectedEstado) === normalizeString(matchingEst)) {
+                                setSelectedEstado("Todos");
+                              } else {
+                                setSelectedEstado(matchingEst);
+                                setSelectedRegion(["Todas"]);
+                              }
+                            }
+                          };
 
                           return (
                             <Geography
                               key={geo.rsmKey}
                               geography={geo}
+                              onClick={handleMapGeographyClick}
                               data-tooltip-id="map-tooltip"
                               data-tooltip-content={tooltipText}
                               fill={fillColor}
                               stroke="#FFFFFF"
                               strokeWidth={0.5}
                               style={{
-                                default: { outline: "none", fill: fillColor, stroke: "#FFFFFF", strokeWidth: 0.5 },
+                                default: { outline: "none", fill: fillColor, stroke: "#FFFFFF", strokeWidth: 0.5, cursor: "pointer" },
                                 hover: { outline: "none", fill: "#3b82f6", stroke: "#FFFFFF", strokeWidth: 1, cursor: "pointer" },
                                 pressed: { outline: "none", fill: fillColor },
-                              }}
+                              } as any}
                             />
                           );
                         })
-                      }
+                    }
                   </Geographies>
                 </ComposableMap>
 
@@ -551,15 +607,15 @@ export default function DashboardStats() {
                   </h3>
                   <span className="bg-[#00205B] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">100%</span>
                 </div>
-                
+
                 <div className="space-y-2 flex-1 overflow-y-auto pr-1">
                   {top5DataList.map((item: any, index: number) => {
                     const percentage = Math.round((item.value / (totalTDD || 1)) * 100);
                     const isTop3 = index < 3;
-                    
+
                     let bgClass = isTop3 ? "bg-[#FE5000]" : "bg-[#009639]";
                     let accentClass = isTop3 ? "text-[#FE5000]" : "text-[#009639]";
-                    
+
                     if (mapTab === "regiones") {
                       const rName = normalizeString(item.name || item.id);
                       if (rName === "ORIENTE") { bgClass = "bg-[#00205B]"; accentClass = "text-[#00205B]"; }
@@ -598,7 +654,7 @@ export default function DashboardStats() {
 
           {/* COLUMNA DERECHA: GRÁFICO DE TORTA */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col h-[480px]">
-             <div className="flex justify-between items-start mb-2 shrink-0">
+            <div className="flex justify-between items-start mb-2 shrink-0">
               <div>
                 <h2 className="text-base font-bold text-[#00205B] leading-tight">Distribución del Volumen por Transacción</h2>
                 <p className="text-[10px] text-gray-400 mt-0.5">Desglose exacto: Primera Vez, Migraciones, Reposiciones</p>
@@ -623,20 +679,20 @@ export default function DashboardStats() {
                       <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <RechartsTooltip 
-                    formatter={(value: number) => [value.toLocaleString(), "TDDs"]}
+                  <RechartsTooltip
+                    formatter={(value: any) => [Number(value || 0).toLocaleString(), "TDDs"]}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
                   />
-                  <Legend 
-                    layout="horizontal" 
-                    verticalAlign="bottom" 
+                  <Legend
+                    layout="horizontal"
+                    verticalAlign="bottom"
                     align="center"
                     iconType="circle"
                     wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '20px' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
-              
+
               {/* Etiqueta central (Total) */}
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center -mt-6">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">TOTAL</p>
@@ -645,13 +701,13 @@ export default function DashboardStats() {
             </div>
           </div>
         </div>
-        
+
         {/* 4. TERCERA FILA: Top 10 Agencias y Gráfico de Barras por Regiones */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          
+
           {/* COLUMNA IZQUIERDA: GRÁFICO DE BARRAS POR REGIONES */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col h-auto">
-             <div className="flex justify-between items-start mb-4 shrink-0">
+            <div className="flex justify-between items-start mb-4 shrink-0">
               <div>
                 <h2 className="text-base font-bold text-[#00205B] leading-tight">Distribución por Regiones</h2>
                 <p className="text-[10px] text-gray-400 mt-0.5">Volumen total de asignaciones TDD por región</p>
@@ -663,17 +719,17 @@ export default function DashboardStats() {
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#F3F4F6" />
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#6B7280', fontWeight: 'bold' }} width={110} />
-                  <RechartsTooltip 
-                    formatter={(value: number) => [value.toLocaleString(), "TDDs"]}
+                  <RechartsTooltip
+                    formatter={(value: any) => [Number(value || 0).toLocaleString(), "TDDs"]}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
-                    cursor={{fill: '#F9FAFB'}}
+                    cursor={{ fill: '#F9FAFB' }}
                   />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={32}>
-                    <LabelList 
-                      dataKey="value" 
-                      position="right" 
-                      formatter={(val: number) => val.toLocaleString()} 
-                      style={{ fontSize: '10px', fontWeight: 'bold', fill: '#0B132B' }} 
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      formatter={(val: any) => Number(val || 0).toLocaleString()}
+                      style={{ fontSize: '10px', fontWeight: 'bold', fill: '#0B132B' }}
                     />
                     {regionesData.map((entry: any, index: number) => {
                       const rName = normalizeString(entry.name);
@@ -694,11 +750,11 @@ export default function DashboardStats() {
 
           {/* COLUMNA DERECHA: TOP 10 AGENCIAS */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-auto">
-             <div className="p-4 border-b border-gray-100 shrink-0">
-               <h3 className="text-sm font-bold text-[#0B132B] uppercase">Top 10 Agencias con mayores asignaciones</h3>
-               <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider">Acumulado histórico de asignaciones</p>
-             </div>
-             <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+            <div className="p-4 border-b border-gray-100 shrink-0">
+              <h3 className="text-sm font-bold text-[#0B132B] uppercase">Top 10 Agencias con mayores asignaciones</h3>
+              <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider">Acumulado histórico de asignaciones</p>
+            </div>
+            <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
               {((stats?.top_agencias || stats?.agencias || [])?.length > 0) ? (
                 <div className="flex flex-col gap-1 p-3">
                   {((stats?.top_agencias || stats?.agencias || []).slice(0, 10)).map((agencia: any, index: number) => {
@@ -707,7 +763,7 @@ export default function DashboardStats() {
                     const barWidth = `${(agencia.value / maxAsig) * 100}%`;
                     const colorClass = index === 0 ? "bg-[#00205B]" : index === 1 ? "bg-[#FE5000]" : index === 2 ? "bg-[#009639]" : "bg-gray-400";
                     const textColor = index === 0 ? "text-[#00205B]" : index === 1 ? "text-[#FE5000]" : index === 2 ? "text-[#009639]" : "text-[#0B132B]";
-                    
+
                     const nombreAgencia = agencia.name || agencia.id || agencia.codigo || "Desconocida";
 
                     return (
@@ -732,14 +788,14 @@ export default function DashboardStats() {
               ) : (
                 <div className="flex h-full items-center justify-center text-xs text-gray-400 italic">No hay datos de agencias.</div>
               )}
-             </div>
+            </div>
           </div>
-          
+
         </div>
 
         {/* 5. CRECIMIENTO MENSUAL Y TABLA */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
-          
+
           {/* GRÁFICO DE ÁREA */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col min-w-0">
             <div className="flex justify-between items-start mb-6">
@@ -748,48 +804,48 @@ export default function DashboardStats() {
                 <p className="text-[10px] text-gray-400 mt-0.5">Evolución mensual de asignaciones por tipo de TDD</p>
               </div>
             </div>
-            
+
             <div className="flex-1 w-full h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart 
+                <AreaChart
                   data={pivotData.map(row => ({
                     ...row,
                     monthName: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][row.mes - 1]
-                  }))} 
+                  }))}
                   margin={{ top: 36, right: 25, left: -5, bottom: 0 }}
                 >
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00205B" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#00205B" stopOpacity={0.0}/>
+                      <stop offset="5%" stopColor="#00205B" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#00205B" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis 
-                    dataKey="monthName" 
-                    tick={{ fontSize: 10, fill: "#9CA3AF", fontWeight: "bold" }} 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <XAxis
+                    dataKey="monthName"
+                    tick={{ fontSize: 10, fill: "#9CA3AF", fontWeight: "bold" }}
+                    axisLine={false}
+                    tickLine={false}
                     dy={10}
                   />
-                  <YAxis 
-                    tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val} 
-                    tick={{ fontSize: 10, fill: "#9CA3AF", fontWeight: "bold" }} 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <YAxis
+                    tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}
+                    tick={{ fontSize: 10, fill: "#9CA3AF", fontWeight: "bold" }}
+                    axisLine={false}
+                    tickLine={false}
                     dx={-10}
                   />
-                  <RechartsTooltip 
+                  <RechartsTooltip
                     contentStyle={{ borderRadius: '8px', border: '1px solid #f3f4f6', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', fontSize: '11px', fontWeight: 'bold', padding: '12px' }}
                     formatter={(value: any) => [new Intl.NumberFormat('es-VE').format(value), "Total General"]}
                     labelStyle={{ color: '#0B132B', marginBottom: '4px' }}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="total" 
-                    stroke="#00205B" 
-                    strokeWidth={3} 
-                    fill="url(#colorTotal)" 
+                  <Area
+                    type="monotone"
+                    dataKey="total"
+                    stroke="#00205B"
+                    strokeWidth={3}
+                    fill="url(#colorTotal)"
                     dot={(dotProps: any) => {
                       const val = Number(dotProps.payload?.total ?? (Array.isArray(dotProps.value) ? dotProps.value[1] : dotProps.value)) || 0;
                       if (val <= 0) return null;
@@ -805,10 +861,10 @@ export default function DashboardStats() {
                         />
                       );
                     }}
-                    activeDot={{ r: 6, stroke: '#FE5000', strokeWidth: 2, fill: '#00205B' }} 
+                    activeDot={{ r: 6, stroke: '#FE5000', strokeWidth: 2, fill: '#00205B' }}
                   >
-                    <LabelList 
-                      dataKey="total" 
+                    <LabelList
+                      dataKey="total"
                       content={(labelProps: any) => {
                         const { x, y, value } = labelProps;
                         if (!value || Number(value) === 0) return null;
@@ -863,7 +919,7 @@ export default function DashboardStats() {
                 <p className="text-[10px] text-gray-400 mt-0.5">Desglose mensualizado de transacciones</p>
               </div>
             </div>
-            
+
             <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="w-full text-left text-[11px] text-gray-600">
                 <thead className="bg-[#00205B] text-white font-bold text-[9px] tracking-wider uppercase">

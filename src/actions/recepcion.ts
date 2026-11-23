@@ -60,7 +60,7 @@ export async function verifyDispatch(codigoAgencia: string, correlativoInicial: 
     return { success: false, message: 'No se encontró un envío con esos datos. Verifique el código y ambos correlativos.' };
   }
 
-  const despacho = data[0];
+  const despacho: any = data[0];
 
   // Si no se obtuvo el nombre de la agencia por la relación FK (por ej. por diferencia de padding en agencias.codigo),
   // buscamos directamente en la tabla agencias con los candidatos

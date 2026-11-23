@@ -1298,37 +1298,42 @@ export default function ReportGenerator() {
                               </div>
                             </div>
                             
-                            {/* COL 3: Cantidad, Fecha (Izquierda) + QR Grande (Derecha) */}
+                            {/* COL 3: Cantidad, Fecha (Izquierda) + QR Grande con Encabezado Obligatorio (Derecha) */}
                             <div className="w-[34%] flex items-center justify-between gap-2.5 pl-3 border-l-2 border-gray-200 h-full">
-                              <div className="flex-1 flex flex-col justify-center gap-2 min-w-0">
-                                <div className="bg-blue-50/50 p-2 border border-blue-100 rounded-lg">
-                                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Cantidad Enviada</p>
-                                  <p className="text-lg font-black text-[#009639] leading-none">
-                                    {Number(d.cantidad).toLocaleString('es-VE')} <span className="text-[9px] text-gray-600 font-bold">UND</span>
+                              <div className="flex-1 flex flex-col justify-center gap-2.5 min-w-0">
+                                <div className="bg-blue-50/50 p-2.5 border border-blue-100 rounded-lg">
+                                  <p className="text-[8.5px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Cantidad Enviada</p>
+                                  <p className="text-xl font-black text-[#009639] leading-none">
+                                    {Number(d.cantidad).toLocaleString('es-VE')} <span className="text-[9.5px] text-gray-600 font-bold">UND</span>
                                   </p>
                                 </div>
-                                <div className="bg-gray-50 p-2 border border-gray-200 rounded-lg">
-                                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Fecha Envío</p>
-                                  <p className="text-xs font-black text-gray-900 leading-tight mt-0.5">
+                                <div className="bg-gray-50 p-2.5 border border-gray-200 rounded-lg">
+                                  <p className="text-[8.5px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Fecha de Envío</p>
+                                  <p className="text-xs font-black text-gray-900 leading-tight">
                                     {formatLocalDate(dateToPrint)}
-                                  </p>
-                                  <p className="text-[6.8px] font-black text-[#00205B] uppercase tracking-tight mt-1 leading-tight">
-                                    📱 Escanear QR al recibir
                                   </p>
                                 </div>
                               </div>
 
-                              {/* QR Grande a toda altura de la columna derecha */}
+                              {/* QR Grande con mensaje "Escanea para confirmar Recepción (Obligatorio)" encima */}
                               {(() => {
                                 const origin = typeof window !== 'undefined' ? window.location.origin : '';
                                 const qrTarget = `${origin}/recepcion?agencia=${encodeURIComponent(d.codigo_agencia || '')}${d.correlativo_inicial ? `&ini=${encodeURIComponent(String(d.correlativo_inicial).replace(/\D/g, ''))}` : ''}${d.correlativo_final ? `&fin=${encodeURIComponent(String(d.correlativo_final).replace(/\D/g, ''))}` : ''}`;
                                 const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=${encodeURIComponent(qrTarget)}`;
                                 return (
-                                  <div className="shrink-0 flex flex-col items-center justify-center bg-white p-1.5 rounded-xl border-2 border-[#00205B]/20 shadow-2xs">
+                                  <div className="shrink-0 flex flex-col items-center justify-center bg-white px-2 py-1.5 rounded-xl border-2 border-[#00205B]/30 shadow-2xs w-[124px] sm:w-[132px] print:w-[116px]">
+                                    <div className="w-full text-center mb-1 pb-1 border-b border-gray-200">
+                                      <p className="text-[7px] font-black text-[#00205B] uppercase leading-tight tracking-tight">
+                                        Escanea para confirmar Recepción
+                                      </p>
+                                      <span className="inline-block mt-0.5 px-1.5 py-[1px] bg-[#FE5000] text-white text-[6.5px] font-black uppercase tracking-wider rounded-sm leading-none">
+                                        Obligatorio
+                                      </span>
+                                    </div>
                                     <img
                                       src={qrImgUrl}
                                       alt="QR Recepción"
-                                      className="w-24 h-24 sm:w-28 sm:h-28 print:w-[96px] print:h-[96px] object-contain"
+                                      className="w-24 h-24 sm:w-[104px] sm:h-[104px] print:w-[90px] print:h-[90px] object-contain"
                                       onError={(e) => {
                                         e.currentTarget.style.display = 'none';
                                       }}

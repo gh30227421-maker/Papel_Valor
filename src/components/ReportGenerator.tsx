@@ -1244,9 +1244,9 @@ export default function ReportGenerator() {
                       {chunk.map((d, i) => (
                         <div key={d.id} className="border-2 border-dashed border-gray-400 p-4 flex flex-col justify-between relative bg-white min-h-[200px] print:min-h-[22vh]">
                           
-                          <div className="flex-1 flex items-center gap-4">
+                          <div className="flex-1 flex items-center gap-3">
                             {/* COL 1: Logo & Info Bancaria */}
-                            <div className="w-[22%] flex flex-col items-center justify-center border-r-2 border-gray-200 pr-3 h-full">
+                            <div className="w-[20%] flex flex-col items-center justify-center border-r-2 border-gray-200 pr-2.5 h-full">
                               <img 
                                 src="/logo-bnc.png" 
                                 alt="Logo BNC" 
@@ -1257,13 +1257,13 @@ export default function ReportGenerator() {
                               />
                               <h2 className="text-[11px] font-black text-[#00205B] text-center leading-tight">BANCO NACIONAL DE CRÉDITO</h2>
                               <h3 className="text-[7.5px] font-bold text-gray-500 mt-1 uppercase tracking-widest text-center">V.P.E BANCA COMERCIAL</h3>
-                              <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 border border-gray-300 text-[8.5px] font-bold text-gray-800 tracking-wider rounded-sm text-center">
+                              <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 border border-gray-300 text-[8px] font-bold text-gray-800 tracking-wider rounded-sm text-center">
                                 INVENTARIO PAPEL VALOR
                               </span>
                             </div>
                             
                             {/* COL 2: Producto y Destino */}
-                            <div className="w-[51%] flex flex-col justify-center px-2 h-full">
+                            <div className="w-[46%] flex flex-col justify-center px-1.5 h-full">
                               <div className="mb-1.5 flex items-center justify-between">
                                 <div>
                                   <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Producto</p>
@@ -1298,40 +1298,44 @@ export default function ReportGenerator() {
                               </div>
                             </div>
                             
-                            {/* COL 3: Cantidad, Fecha y QR de Recepción */}
-                            <div className="w-[27%] flex flex-col justify-center gap-2 pl-3 border-l-2 border-gray-200 h-full">
-                              <div className="bg-blue-50/50 p-2 border border-blue-100 rounded-lg">
-                                <p className="text-[8.5px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Cantidad Enviada</p>
-                                <p className="text-lg font-black text-[#009639] leading-tight">
-                                  {Number(d.cantidad).toLocaleString('es-VE')} <span className="text-[9.5px] text-gray-600 font-bold">UND</span>
-                                </p>
-                              </div>
-                              <div className="flex items-center justify-between gap-2 bg-gray-50 p-1.5 border border-gray-200 rounded-lg">
-                                <div className="min-w-0">
-                                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Fecha Envío</p>
-                                  <p className="text-[11px] font-black text-gray-800 leading-tight mt-0.5">
-                                    {formatLocalDate(dateToPrint)}
-                                  </p>
-                                  <p className="text-[7px] font-bold text-[#00205B] uppercase tracking-tight mt-1 leading-tight">
-                                    📱 Escanear QR para confirmar recepción
+                            {/* COL 3: Cantidad, Fecha (Izquierda) + QR Grande (Derecha) */}
+                            <div className="w-[34%] flex items-center justify-between gap-2.5 pl-3 border-l-2 border-gray-200 h-full">
+                              <div className="flex-1 flex flex-col justify-center gap-2 min-w-0">
+                                <div className="bg-blue-50/50 p-2 border border-blue-100 rounded-lg">
+                                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Cantidad Enviada</p>
+                                  <p className="text-lg font-black text-[#009639] leading-none">
+                                    {Number(d.cantidad).toLocaleString('es-VE')} <span className="text-[9px] text-gray-600 font-bold">UND</span>
                                   </p>
                                 </div>
-                                {(() => {
-                                  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                                  const qrTarget = `${origin}/recepcion?agencia=${encodeURIComponent(d.codigo_agencia || '')}${d.correlativo_inicial ? `&ini=${encodeURIComponent(String(d.correlativo_inicial).replace(/\D/g, ''))}` : ''}${d.correlativo_final ? `&fin=${encodeURIComponent(String(d.correlativo_final).replace(/\D/g, ''))}` : ''}`;
-                                  const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=2&data=${encodeURIComponent(qrTarget)}`;
-                                  return (
+                                <div className="bg-gray-50 p-2 border border-gray-200 rounded-lg">
+                                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Fecha Envío</p>
+                                  <p className="text-xs font-black text-gray-900 leading-tight mt-0.5">
+                                    {formatLocalDate(dateToPrint)}
+                                  </p>
+                                  <p className="text-[6.8px] font-black text-[#00205B] uppercase tracking-tight mt-1 leading-tight">
+                                    📱 Escanear QR al recibir
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* QR Grande a toda altura de la columna derecha */}
+                              {(() => {
+                                const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                                const qrTarget = `${origin}/recepcion?agencia=${encodeURIComponent(d.codigo_agencia || '')}${d.correlativo_inicial ? `&ini=${encodeURIComponent(String(d.correlativo_inicial).replace(/\D/g, ''))}` : ''}${d.correlativo_final ? `&fin=${encodeURIComponent(String(d.correlativo_final).replace(/\D/g, ''))}` : ''}`;
+                                const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=${encodeURIComponent(qrTarget)}`;
+                                return (
+                                  <div className="shrink-0 flex flex-col items-center justify-center bg-white p-1.5 rounded-xl border-2 border-[#00205B]/20 shadow-2xs">
                                     <img
                                       src={qrImgUrl}
                                       alt="QR Recepción"
-                                      className="w-14 h-14 object-contain bg-white p-0.5 rounded border border-gray-300 shrink-0"
+                                      className="w-24 h-24 sm:w-28 sm:h-28 print:w-[96px] print:h-[96px] object-contain"
                                       onError={(e) => {
                                         e.currentTarget.style.display = 'none';
                                       }}
                                     />
-                                  );
-                                })()}
-                              </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
 

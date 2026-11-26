@@ -26,6 +26,7 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
   const [isSearchingAgency, setIsSearchingAgency] = useState(false);
   const [allAgencies, setAllAgencies] = useState<AgencyData[]>([]);
   const [lastCorrelativeUsed, setLastCorrelativeUsed] = useState<string>("");
+  const [isLookingUpStockCorr, setIsLookingUpStockCorr] = useState<boolean>(false);
   const [bovedaDisponible, setBovedaDisponible] = useState<number | null>(null);
   const [custodiaActual, setCustodiaActual] = useState<number>(0);
   const [deductFromCustodia, setDeductFromCustodia] = useState<boolean>(false);
@@ -183,34 +184,88 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
     setCorrelativeError("");
   };
 
-  // Calcula un correlativo de 16 dígitos sumando delta a los dígitos centrales [8..14]
-  const computeCorrelativeOffset = (base16: string, delta: number): string | null => {
+  // Busca en la tabla stock_actual el correlativo exacto de 16 dígitos (incluyendo los últimos 2 dígitos de control reales)
+  // que corresponde al prefijo de 14 dígitos (base[0..8] + serial de 6 dígitos)
+  const findExactCorrelativeInStock = async (base16: string, delta: number): Promise<string | null> => {
     if (base16.length !== 16 || !/^\d+$/.test(base16)) return null;
-    const prefix = base16.substring(0, 8);
+    const prefix8 = base16.substring(0, 8);
     const serialNum = parseInt(base16.substring(8, 14), 10);
-    const suffix = base16.substring(14, 16);
-    const nextSerial = serialNum + delta;
-    if (nextSerial < 0 || nextSerial > 999999) return null;
-    return `${prefix}${String(nextSerial).padStart(6, "0")}${suffix}`;
+    const targetSerial = serialNum + delta;
+    if (targetSerial < 0 || targetSerial > 999999) return null;
+
+    const prefix14 = `${prefix8}${String(targetSerial).padStart(6, "0")}`;
+    const minCorr16 = `${prefix14}00`;
+    const maxCorr16 = `${prefix14}99`;
+
+    // 1. Buscamos coincidencia exacta del serial objetivo en stock_actual (rango indexado 00..99)
+    const { data: exactRows } = await supabase
+      .from("stock_actual")
+      .select("correlativo")
+      .gte("correlativo", minCorr16)
+      .lte("correlativo", maxCorr16)
+      .order("correlativo", { ascending: true })
+      .limit(1);
+
+    if (exactRows && exactRows.length > 0 && exactRows[0].correlativo) {
+      const cleaned = String(exactRows[0].correlativo).replace(/\D/g, "");
+      if (cleaned.length === 16) return cleaned;
+    }
+
+    // 2. Si es para sugerir el siguiente inicial (delta === 1) y hubiera un salto en la secuencia,
+    // buscamos el primer correlativo real en stock_actual que sea estrictamente mayor a base16
+    if (delta === 1) {
+      const { data: nextRows } = await supabase
+        .from("stock_actual")
+        .select("correlativo")
+        .gt("correlativo", base16)
+        .order("correlativo", { ascending: true })
+        .limit(1);
+
+      if (nextRows && nextRows.length > 0 && nextRows[0].correlativo) {
+        const cleaned = String(nextRows[0].correlativo).replace(/\D/g, "");
+        if (cleaned.length === 16) return cleaned;
+      }
+    }
+
+    return null;
   };
 
-  const handleApplyQuickBatch = (batchSize: number) => {
-    if (!isValidInitial) return;
-    const computedFinal = computeCorrelativeOffset(initialCorrelative, batchSize - 1);
-    if (computedFinal) {
-      setFinalCorrelative(computedFinal);
-      setCorrelativeError("");
-      setTimeout(() => despacharBtnRef.current?.focus(), 50);
+  const handleApplyQuickBatch = async (batchSize: number) => {
+    if (!isValidInitial || isLookingUpStockCorr) return;
+    setIsLookingUpStockCorr(true);
+    setCorrelativeError("");
+    try {
+      const exactFromStock = await findExactCorrelativeInStock(initialCorrelative, batchSize - 1);
+      if (exactFromStock) {
+        setFinalCorrelative(exactFromStock);
+        setTimeout(() => despacharBtnRef.current?.focus(), 50);
+      } else {
+        const targetSerial = String(parseInt(initialCorrelative.substring(8, 14), 10) + (batchSize - 1)).padStart(6, "0");
+        setCorrelativeError(
+          `No se encontró en stock_actual la tarjeta con serial #${targetSerial} para cerrar el lote de ${batchSize}. Verifique el inventario cargado.`
+        );
+      }
+    } finally {
+      setIsLookingUpStockCorr(false);
     }
   };
 
-  const handleSuggestNextInitial = () => {
-    if (!lastCorrelativeUsed || lastCorrelativeUsed.length !== 16) return;
-    const nextInitial = computeCorrelativeOffset(lastCorrelativeUsed, 1);
-    if (nextInitial) {
-      setInitialCorrelative(nextInitial);
-      setCorrelativeError("");
-      setTimeout(() => finalCorrelativeRef.current?.focus(), 50);
+  const handleSuggestNextInitial = async () => {
+    if (!lastCorrelativeUsed || lastCorrelativeUsed.length !== 16 || isLookingUpStockCorr) return;
+    setIsLookingUpStockCorr(true);
+    setCorrelativeError("");
+    try {
+      const exactNext = await findExactCorrelativeInStock(lastCorrelativeUsed, 1);
+      if (exactNext) {
+        setInitialCorrelative(exactNext);
+        setTimeout(() => finalCorrelativeRef.current?.focus(), 50);
+      } else {
+        setCorrelativeError(
+          `No se encontró en stock_actual el siguiente correlativo posterior a ${lastCorrelativeUsed}.`
+        );
+      }
+    } finally {
+      setIsLookingUpStockCorr(false);
     }
   };
 
@@ -431,11 +486,12 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                 </span>
                 <button
                   type="button"
+                  disabled={isLookingUpStockCorr}
                   onClick={handleSuggestNextInitial}
-                  className="text-[10px] font-black bg-[#00205B] hover:bg-[#00153D] text-white px-2 py-0.5 rounded shadow-2xs transition-colors cursor-pointer"
-                  title="Rellenar el Correlativo Inicial con el siguiente serial disponible (+1)"
+                  className="text-[10px] font-black bg-[#00205B] hover:bg-[#00153D] text-white px-2.5 py-0.5 rounded shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                  title="Buscar en stock_actual el siguiente correlativo real exacto (+1)"
                 >
-                  Usar Siguiente (+1)
+                  {isLookingUpStockCorr ? "Buscando en Stock..." : "Usar Siguiente (+1)"}
                 </button>
               </div>
             )}
@@ -506,10 +562,10 @@ export default function DispatchForm({ onSuccess }: { onSuccess?: () => void }) 
                         <button
                           key={preset.qty}
                           type="button"
-                          disabled={!isValidInitial}
+                          disabled={!isValidInitial || isLookingUpStockCorr}
                           onClick={() => handleApplyQuickBatch(preset.qty)}
                           className="px-2 py-0.5 text-[9.5px] font-black rounded border border-emerald-200 bg-emerald-50 text-[#009639] hover:bg-[#009639] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                          title={`Autocompletar correlativo final para ${preset.qty} tarjetas`}
+                          title={`Buscar en stock_actual el correlativo final exacto para ${preset.qty} tarjetas`}
                         >
                           {preset.label}
                         </button>
